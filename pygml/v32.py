@@ -30,7 +30,6 @@ from typing import List, Dict
 from lxml import etree
 
 from .basics import parse_coordinates, parse_pos
-from .geometry import Geometry
 
 
 NAMESPACE = 'http://www.opengis.net/gml/3.2'
@@ -77,5 +76,4 @@ def parse_v32(element: etree._Element) -> dict:
     elif qname.localname == 'MultiPoint':
         pass
 
-    return Geometry(geometry)
-
+    return geometry

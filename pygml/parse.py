@@ -46,10 +46,10 @@ def parse(source: Union[etree._Element, str]) -> Geometry:
 
     namespace = etree.QName(element.tag).namespace
     if namespace == 'http://www.opengis.net/gml':
-        result = parse_pre_v32
+        result = parse_pre_v32(element)
     elif namespace == 'http://www.opengis.net/gml/3.2':
-        result = parse_v32
+        result = parse_v32(element)
     elif namespace == 'http://www.opengis.net/gml/3.3/ce':
-        result = parse_v33_ce
+        result = parse_v33_ce(element)
 
     return Geometry(result)
