@@ -25,6 +25,57 @@
 # THE SOFTWARE.
 # ------------------------------------------------------------------------------
 
+from typing import List, Dict
 
-def parse_v32():
-    pass
+from lxml import etree
+
+from .basics import parse_coordinates, parse_pos
+from .geometry import Geometry
+
+
+NAMESPACE = 'http://www.opengis.net/gml/3.2'
+NSMAP = {'gml': NAMESPACE}
+
+
+def _get_positions(element: etree._Element, nsmap: Dict[str, str]) -> List[etree._Element]:
+    return element.xpath('gml:pos', namespaces=nsmap)
+
+
+def _get_coordinates(element: etree._Element, nsmap: Dict[str, str]) -> List[etree._Element]:
+    return element.xpath('gml:coordinates', namespaces=nsmap)
+
+
+def parse_v32(element: etree._Element) -> dict:
+    qname = etree.QName(element.tag)
+    assert qname.namespace == NAMESPACE
+
+    if qname.localname == 'Point':
+        positions = _get_positions(element, NSMAP)
+        if positions:
+            assert len(positions) == 1, 'Too many gml:pos elements'
+            coords = parse_pos(positions[0].text)
+        else:
+            coordinates = _get_coordinates(element, NSMAP)
+            if not coordinates:
+                raise AssertionError(
+                    'Neither gml:pos nor gml:coordinates found'
+                )
+            assert len(coordinates) == 1, 'Too many gml:coordinates elements'
+            coordinates0 = coordinates[0]
+            coords = parse_coordinates(
+                coordinates0.text,
+                cs=coordinates0.attrib.get('cs', ','),
+                ts=coordinates0.attrib.get('ts', ' '),
+                decimal=coordinates0.attrib.get('decimal', '.'),
+            )[0]
+
+        geometry = {
+            'type': 'Point',
+            'coordinates': coords
+        }
+
+    elif qname.localname == 'MultiPoint':
+        pass
+
+    return Geometry(geometry)
+
