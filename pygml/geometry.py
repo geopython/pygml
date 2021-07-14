@@ -1,8 +1,11 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class Geometry:
+    """ Simple container class to hold a geometry and expose it via the
+        `__geo_interface__`
+    """
     geometry: dict
 
     @property
