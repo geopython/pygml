@@ -61,6 +61,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        "dataclasses;python_version<'3.7'",
         "lxml",
     ] if not on_rtd else [],
     classifiers=[
