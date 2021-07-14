@@ -1,6 +1,8 @@
 import pytest
 
-from pygml.basics import parse_coordinates, parse_poslist, parse_pos, swap_coordinates_xy
+from pygml.basics import (
+    parse_coordinates, parse_poslist, parse_pos, swap_coordinates_xy
+)
 
 
 def test_parse_coordinates():
@@ -65,4 +67,3 @@ def test_swap_coordinates_xy():
     coord = [[12.34, 56.7, 89.10], [11.12, 13.14, 15.16]]
     swap_coordinates_xy(coord)
     assert coord == [[56.7, 12.34, 89.10], [13.14, 11.12, 15.16]]
-
