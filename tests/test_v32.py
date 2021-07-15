@@ -40,7 +40,7 @@ def test_parse_point():
             </gml:Point>
         """)
     )
-    assert result == {'type': 'Point', 'coordinates': [1.0, 1.0]}
+    assert result == {'type': 'Point', 'coordinates': (1.0, 1.0)}
 
     # using gml:coordinates instead
     result = parse_v32(
@@ -50,4 +50,4 @@ def test_parse_point():
             </gml:Point>
         """)
     )
-    assert result == {'type': 'Point', 'coordinates': [1.0, 1.0]}
+    assert result == {'type': 'Point', 'coordinates': (1.0, 1.0)}

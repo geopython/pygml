@@ -58,10 +58,10 @@ def parse_coordinates(value: str, cs: str = ',', ts: str = ' ',
     number_parser = _make_number_parser(decimal)
 
     return [
-        [
+        tuple(
             number_parser(number)
             for number in coordinate.strip().split(ts)
-        ]
+        )
         for coordinate in value.strip().split(cs)
     ]
 
@@ -75,7 +75,7 @@ def parse_poslist(value: str, dimensions: int = 2) -> Coordinates:
         raise ValueError('Invalid dimensionality of pos list')
 
     return [
-        raw[i:i + dimensions]
+        tuple(raw[i:i + dimensions])
         for i in range(0, len(raw), dimensions)
     ]
 
@@ -83,11 +83,13 @@ def parse_poslist(value: str, dimensions: int = 2) -> Coordinates:
 def parse_pos(value: str) -> Coordinate:
     """ Parses a single gml:pos to a `Coordinate` structure.
     """
-    return [float(v) for v in value.split()]
+    return tuple(float(v) for v in value.split())
 
 
-def swap_coordinates_xy(coordinates: Coordinates):
-    """ Swaps the X and Y coordinates in-place of a given coordinates list
+def swap_coordinates_xy(coordinates: Coordinates) -> Coordinates:
+    """ Swaps the X and Y coordinates of a given coordinates list
     """
-    for coordinate in coordinates:
-        coordinate[1], coordinate[0] = coordinate[0], coordinate[1]
+    return [
+        (coordinate[1], coordinate[0], *coordinate[2:])
+        for coordinate in coordinates
+    ]
