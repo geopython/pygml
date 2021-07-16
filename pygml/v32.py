@@ -29,7 +29,10 @@ from typing import List, Dict
 
 from lxml import etree
 
-from .basics import parse_coordinates, parse_pos, parse_poslist
+from .basics import (
+    parse_coordinates, parse_pos, parse_poslist, swap_coordinates_xy
+)
+from .axisorder import is_crs_yx
 
 
 NAMESPACE = 'http://www.opengis.net/gml/3.2'
@@ -59,6 +62,9 @@ def parse_v32(element: etree._Element) -> dict:
 
     elif qname.localname == 'Polygon':
         geometry = _parse_polygon(element)
+
+    elif qname.localname == 'MultiGeometry':
+        geometry = _parse_multi_geometry(element)
 
     return geometry
 
@@ -133,4 +139,15 @@ def _parse_polygon(element: etree._Element) -> dict:
     return {
         'type': 'Polygon',
         'coordinates': [exterior, *interiors]
+    }
+
+
+def _parse_multi_geometry(element: etree._Element) -> dict:
+    sub_elements = element.xpath(
+        '(gml:geometryMember|gml:geometryMembers)/*', namespaces=NSMAP
+    )
+
+    return {
+        'type': 'GeometryCollection',
+        'geometries': [parse_v32(sub_element) for sub_element in sub_elements]
     }

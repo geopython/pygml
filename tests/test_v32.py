@@ -87,3 +87,91 @@ def test_parse_polygon():
         [(1.0, 1.0)],
         [(1.0, 1.0)],
     ]}
+
+
+def test_parse_multi_geometry():
+    # using geometryMembers
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:MultiGeometry gml:id="ID"  xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:geometryMembers>
+                <gml:Point gml:id="ID">
+                    <gml:pos>1.0 1.0</gml:pos>
+                </gml:Point>
+                <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>1.0 1.0</gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>1.0 1.0</gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:geometryMembers>
+        </gml:MultiGeometry>
+        """)
+    )
+
+    assert result == {
+        'type': 'GeometryCollection',
+        'geometries': [
+            {
+                'type': 'Point',
+                'coordinates': (1.0, 1.0)
+            },
+            {
+                'type': 'Polygon',
+                'coordinates': [
+                    [(1.0, 1.0)],
+                    [(1.0, 1.0)],
+                ]
+            },
+        ]
+    }
+
+    # using geometryMember
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:MultiGeometry gml:id="ID"  xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:geometryMember>
+                <gml:Point gml:id="ID">
+                    <gml:pos>1.0 1.0</gml:pos>
+                </gml:Point>
+            </gml:geometryMember>
+            <gml:geometryMember>
+                <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>1.0 1.0</gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>1.0 1.0</gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:geometryMember>
+        </gml:MultiGeometry>
+        """)
+    )
+
+    assert result == {
+        'type': 'GeometryCollection',
+        'geometries': [
+            {
+                'type': 'Point',
+                'coordinates': (1.0, 1.0)
+            },
+            {
+                'type': 'Polygon',
+                'coordinates': [
+                    [(1.0, 1.0)],
+                    [(1.0, 1.0)],
+                ]
+            },
+        ]
+    }
