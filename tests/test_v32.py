@@ -51,3 +51,39 @@ def test_parse_point():
         """)
     )
     assert result == {'type': 'Point', 'coordinates': (1.0, 1.0)}
+
+
+def test_parse_linestring():
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:posList>1.0 1.0</gml:posList>
+        </gml:LineString>
+        """)
+    )
+    assert result == {'type': 'LineString', 'coordinates': [
+        (1.0, 1.0),
+    ]}
+
+
+def test_parse_polygon():
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:posList>1.0 1.0</gml:posList>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:posList>1.0 1.0</gml:posList>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+        """)
+    )
+    assert result == {'type': 'Polygon', 'coordinates': [
+        [(1.0, 1.0)],
+        [(1.0, 1.0)],
+    ]}
