@@ -34,6 +34,7 @@ from .basics import (
     swap_coordinates_xy
 )
 from .axisorder import is_crs_yx
+from .types import GeomDict
 
 
 NAMESPACE = 'http://www.opengis.net/gml/3.2'
@@ -54,13 +55,13 @@ _HANDLERS = {}
 
 def handle_element(tag_localname: str) -> Callable:
     """ Decorator to register a handler function for an XML tag localname """
-    def inner(func: Callable):
+    def inner(func: Callable[Tuple[]]):
         _HANDLERS[tag_localname] = func
 
     return inner
 
 
-def parse_v32(element: Element) -> dict:
+def parse_v32(element: Element) -> GeomDict:
     """ Main parsing function for GML 3.2 XML structures.
 
         The following XML tags can be parsed to their respective GeoJSON
@@ -115,15 +116,36 @@ def parse_v32(element: Element) -> dict:
     return geometry
 
 
-def maybe_swap_coordinates(geometry: dict, srs: str) -> dict:
-    type_ = geometry['type']
+def maybe_swap_coordinates(geometry: GeomDict, srs: str) -> GeomDict:
+    if is_crs_yx(srs):
+        type_ = geometry['type']
+        coordinates = geometry['coordinates']
 
-    # TODO!
-
+        if type_ == 'Point':
+            coordinates = (coordinates[1], coordinates[0], *coordinates[2:])
+        elif type_ in ('MultiPoint', 'LineString'):
+            coordinates = swap_coordinates_xy(coordinates)
+        elif type_ in ('MultiLineString', 'Polygon'):
+            coordinates = [
+                swap_coordinates_xy(line)
+                for line in coordinates
+            ]
+        elif type_ == 'MultiPolygon':
+            coordinates = [
+                [
+                    swap_coordinates_xy(line)
+                    for line in polygon
+                ] for polygon in coordinates
+            ]
+        # GeometryCollection are
+        geometry['coordinates'] = coordinates
+        return geometry
+    else:
+        return geometry
 
 
 @handle_element('Point')
-def _parse_point(element: Element) -> Tuple[dict, str]:
+def _parse_point(element: Element) -> Tuple[GeomDict, str]:
     positions = element.xpath('gml:pos', namespaces=NSMAP)
     coordinates = element.xpath('gml:coordinates', namespaces=NSMAP)
     if positions:
@@ -152,7 +174,7 @@ def _parse_point(element: Element) -> Tuple[dict, str]:
 
 
 @handle_element('MultiPoint')
-def _parse_multi_point(element: Element) -> Tuple[dict, str]:
+def _parse_multi_point(element: Element) -> Tuple[GeomDict, str]:
     points, srss = zip(*(
         _parse_point(point_elem)
         for point_elem in element.xpath(
@@ -172,7 +194,7 @@ def _parse_multi_point(element: Element) -> Tuple[dict, str]:
 
 
 @handle_element('LineString')
-def _parse_linestring_or_linear_ring(element: Element) -> Tuple[dict, str]:
+def _parse_linestring_or_linear_ring(element: Element) -> Tuple[GeomDict, str]:
     pos_lists = element.xpath('gml:posList', namespaces=NSMAP)
     poss = element.xpath('gml:pos', namespaces=NSMAP)
     coordinates_elems = element.xpath('gml:coordinates', namespaces=NSMAP)
@@ -223,7 +245,7 @@ def _parse_linestring_or_linear_ring(element: Element) -> Tuple[dict, str]:
 
 
 @handle_element('MultiCurve')
-def _parse_multi_curve(element: Element) -> Tuple[dict, str]:
+def _parse_multi_curve(element: Element) -> Tuple[GeomDict, str]:
     linestring_elements = element.xpath(
         '(gml:curveMember|gml:curveMembers)/gml:LineString',
         namespaces=NSMAP
@@ -254,7 +276,7 @@ def _parse_multi_curve(element: Element) -> Tuple[dict, str]:
 
 
 @handle_element('Polygon')
-def _parse_polygon(element: Element) -> Tuple[dict, str]:
+def _parse_polygon(element: Element) -> Tuple[GeomDict, str]:
     exterior_rings = element.xpath(
         'gml:exterior/gml:LinearRing', namespaces=NSMAP
     )
@@ -286,7 +308,7 @@ def _parse_polygon(element: Element) -> Tuple[dict, str]:
 
 
 @handle_element('MultiSurface')
-def _parse_multi_surface(element: Element) -> Tuple[dict, str]:
+def _parse_multi_surface(element: Element) -> Tuple[GeomDict, str]:
     polygon_elements = element.xpath(
         '(gml:surfaceMember|gml:surfaceMembers)/gml:Polygon',
         namespaces=NSMAP
@@ -316,7 +338,7 @@ def _parse_multi_surface(element: Element) -> Tuple[dict, str]:
 
 
 @handle_element('MultiGeometry')
-def _parse_multi_geometry(element: Element) -> Tuple[dict, str]:
+def _parse_multi_geometry(element: Element) -> Tuple[GeomDict, str]:
     sub_elements = element.xpath(
         '(gml:geometryMember|gml:geometryMembers)/*', namespaces=NSMAP
     )

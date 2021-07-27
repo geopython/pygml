@@ -26,11 +26,9 @@
 # ------------------------------------------------------------------------------
 
 
-from typing import Callable, List
+from typing import Callable
 
-# Definition of a coordinate list
-Coordinate = List[float]
-Coordinates = List[Coordinate]
+from .types import Coordinates, Coordinate
 
 
 def _make_number_parser(decimal: str) -> Callable[[str], float]:
