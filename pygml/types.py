@@ -27,18 +27,22 @@
 
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, TypedDict, Union
+from typing import List, Optional, Tuple, Union
 
+try:
+    from typing import TypedDict
+
+    class GeomDict(TypedDict, total=True):
+        type: str
+        coordinates: Union[Tuple, List]
+        crs: Optional[dict]
+
+except ImportError:
+    GeomDict = dict
 
 # Definition of a coordinate list
 Coordinate = List[float]
 Coordinates = List[Coordinate]
-
-
-class GeomDict(TypedDict, total=True):
-    type: str
-    coordinates: Union[Tuple, List]
-    crs: Optional[dict]
 
 
 @dataclass(frozen=True)
