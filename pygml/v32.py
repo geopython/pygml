@@ -55,7 +55,7 @@ _HANDLERS = {}
 
 def handle_element(tag_localname: str) -> Callable:
     """ Decorator to register a handler function for an XML tag localname """
-    def inner(func: Callable[Tuple[]]):
+    def inner(func: Callable[[Element], Tuple[GeomDict, str]]):
         _HANDLERS[tag_localname] = func
 
     return inner
