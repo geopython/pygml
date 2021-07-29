@@ -32,7 +32,7 @@ from lxml import etree
 from .pre_v32 import parse_pre_v32
 from .v32 import parse_v32
 from .v33 import parse_v33_ce
-from .geometry import Geometry
+from .types import Geometry
 
 
 def parse(source: Union[etree._Element, str]) -> Geometry:
