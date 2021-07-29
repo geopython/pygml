@@ -84,6 +84,12 @@ def parse_pos(value: str) -> Coordinate:
     return tuple(float(v) for v in value.split())
 
 
+def swap_coordinate_xy(coordinate: Coordinate) -> Coordinate:
+    """ Swaps the X and Y coordinates of a given coordinate
+    """
+    return (coordinate[1], coordinate[0], *coordinate[2:])
+
+
 def swap_coordinates_xy(coordinates: Coordinates) -> Coordinates:
     """ Swaps the X and Y coordinates of a given coordinates list
     """

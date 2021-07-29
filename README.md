@@ -14,7 +14,7 @@ $ pip install pygml
 
 ## Features
 
-Parse GML 3.1, 3.2 and compact encoded GML 3.3 geometries to a [`__geo_interface__`](https://gist.github.com/sgillies/2217756) compliant class.
+Parse GML 3.1, 3.2, compact encoded GML 3.3 and GeoRSS geometries to a [`__geo_interface__`](https://gist.github.com/sgillies/2217756) compliant class.
 
 
 ```python
@@ -25,7 +25,7 @@ Parse GML 3.1, 3.2 and compact encoded GML 3.3 geometries to a [`__geo_interface
 ... </gml:Point>
 ... """)
 >>> print(geom)
-Geometry(geometry={'type': 'Point', 'coordinates': [1.0, 1.0]})
+Geometry(geometry={'type': 'Point', 'coordinates': (1.0, 1.0)})
 >>> print(geom.__geo_interface__)
-{'type': 'Point', 'coordinates': [1.0, 1.0]}
+{'type': 'Point', 'coordinates': (1.0, 1.0)}
 ```
