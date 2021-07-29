@@ -25,62 +25,148 @@
 # THE SOFTWARE.
 # ------------------------------------------------------------------------------
 
-from typing import List, Dict
+from typing import Callable, List, Optional, Tuple
 
 from lxml import etree
 
 from .basics import (
-    parse_coordinates, parse_pos, parse_poslist, swap_coordinates_xy
+    parse_coordinates, parse_pos, parse_poslist,
+    swap_coordinates_xy
 )
 from .axisorder import is_crs_yx
+from .types import GeomDict
 
 
 NAMESPACE = 'http://www.opengis.net/gml/3.2'
 NSMAP = {'gml': NAMESPACE}
 
 
-def _get_positions(element: etree._Element, nsmap: Dict[str, str]) -> List[etree._Element]:
-    return element.xpath('gml:pos', namespaces=nsmap)
+Element = etree._Element
+Elements = List[Element]
 
 
-def _get_coordinates(element: etree._Element, nsmap: Dict[str, str]) -> List[etree._Element]:
-    return element.xpath('gml:coordinates', namespaces=nsmap)
+def _determine_srs(*srss: List[Optional[str]]) -> Optional[str]:
+    srss = set(srss)
+    if None in srss:
+        srss.remove(None)
+
+    if len(srss) > 1:
+        raise ValueError(f'Conflicting SRS definitions: {", ".join(srss)}')
+    try:
+        return srss.pop()
+    except KeyError:
+        return None
 
 
-def parse_v32(element: etree._Element) -> dict:
+_HANDLERS = {}
+
+
+def handle_element(tag_localname: str) -> Callable:
+    """ Decorator to register a handler function for an XML tag localname """
+    def inner(func: Callable[[Element], Tuple[GeomDict, str]]):
+        _HANDLERS[tag_localname] = func
+        return func
+
+    return inner
+
+
+def parse_v32(element: Element) -> GeomDict:
+    """ Main parsing function for GML 3.2 XML structures.
+
+        The following XML tags can be parsed to their respective GeoJSON
+        counterpart:
+
+          - gml:Point -> Point
+          - gml:MultiPoint -> MultiPoint
+          - gml:LineString -> LineString
+          - gml:MultiCurve (with only gml:LineString curve members)
+            -> MultiLineString
+          - gml:Polygon -> Polygon
+          - gml:MultiSurface (with only gml:Polygon surface members)
+            -> MultiPolygon
+          - gml:MultiGeometry (with any of the aforementioned types as
+            geometry members) -> GeometryCollection
+
+        The SRS of the geometry is determined and the coordinates are
+        flipped to XY order in GeoJSON when they are in YX order in GML.
+
+        Returns:
+            the parsed GeoJSON geometry as a dict. Contains a 'type'
+            field, a 'coordinates' field and potentially a 'crs' field
+            when the geometries SRS could be determined. This field
+            follows the structure laid out in the
+            [draft for GeoJSON](https://gist.github.com/sgillies/1233327).
+    """
     qname = etree.QName(element.tag)
-    assert qname.namespace == NAMESPACE
+    if qname.namespace != NAMESPACE:
+        raise ValueError(f'Namespace {qname.namespace} is not supported')
 
-    if qname.localname == 'Point':
-        geometry = _parse_point(element)
+    # get a registered handler function
+    handler = _HANDLERS.get(qname.localname)
+    if not handler:
+        raise ValueError(
+            f'XML nodes of type {qname.localname} are not supported.'
+        )
 
-    elif qname.localname == 'MultiPoint':
-        pass
+    # parse the geometry
+    geometry, srs = handler(element)
 
-    elif qname.localname == 'LineString':
-        geometry = _parse_linestring(element)
-
-    elif qname.localname == 'Polygon':
-        geometry = _parse_polygon(element)
-
-    elif qname.localname == 'MultiGeometry':
-        geometry = _parse_multi_geometry(element)
+    # handle SRS: maybe swap YX ordered coordinates to XY
+    # and store the SRS as a crs field in the geometry
+    if srs:
+        geometry = maybe_swap_coordinates(geometry, srs)
+        geometry['crs'] = {
+            'type': 'name',
+            'properties': {
+                'name': srs
+            }
+        }
 
     return geometry
 
 
-def _parse_point(element: etree._Element) -> dict:
-    positions = _get_positions(element, NSMAP)
-    if positions:
-        assert len(positions) == 1, 'Too many gml:pos elements'
-        coords = parse_pos(positions[0].text)
+def maybe_swap_coordinates(geometry: GeomDict, srs: str) -> GeomDict:
+    if is_crs_yx(srs):
+        type_ = geometry['type']
+        coordinates = geometry['coordinates']
+
+        if type_ == 'Point':
+            coordinates = (coordinates[1], coordinates[0], *coordinates[2:])
+        elif type_ in ('MultiPoint', 'LineString'):
+            coordinates = swap_coordinates_xy(coordinates)
+        elif type_ in ('MultiLineString', 'Polygon'):
+            coordinates = [
+                swap_coordinates_xy(line)
+                for line in coordinates
+            ]
+        elif type_ == 'MultiPolygon':
+            coordinates = [
+                [
+                    swap_coordinates_xy(line)
+                    for line in polygon
+                ] for polygon in coordinates
+            ]
+        # GeometryCollection are
+        geometry['coordinates'] = coordinates
+        return geometry
     else:
-        coordinates = _get_coordinates(element, NSMAP)
-        if not coordinates:
-            raise AssertionError(
-                'Neither gml:pos nor gml:coordinates found'
-            )
-        assert len(coordinates) == 1, 'Too many gml:coordinates elements'
+        return geometry
+
+
+@handle_element('Point')
+def _parse_point(element: Element) -> Tuple[GeomDict, str]:
+    positions = element.xpath('gml:pos', namespaces=NSMAP)
+    coordinates = element.xpath('gml:coordinates', namespaces=NSMAP)
+    srs = None
+    if positions:
+        if len(positions) > 1:
+            raise ValueError('Too many gml:pos elements')
+        coords = parse_pos(positions[0].text)
+        srs = positions[0].attrib.get('srsName')
+    elif coordinates:
+        if len(coordinates) > 1:
+            raise ValueError('Too many gml:coordinates elements')
+
         coordinates0 = coordinates[0]
         coords = parse_coordinates(
             coordinates0.text,
@@ -88,61 +174,184 @@ def _parse_point(element: etree._Element) -> dict:
             ts=coordinates0.attrib.get('ts', ' '),
             decimal=coordinates0.attrib.get('decimal', '.'),
         )[0]
+    else:
+        raise ValueError(
+            'Neither gml:pos nor gml:coordinates found'
+        )
 
+    srs = _determine_srs(element.attrib.get('srsName'), srs)
     return {
         'type': 'Point',
         'coordinates': coords
-    }
+    }, srs
 
 
-def _parse_linestring(element: etree._Element) -> dict:
+@handle_element('MultiPoint')
+def _parse_multi_point(element: Element) -> Tuple[GeomDict, str]:
+    points, srss = zip(*(
+        _parse_point(point_elem)
+        for point_elem in element.xpath(
+            '(gml:pointMember|gml:pointMembers)/*', namespaces=NSMAP
+        )
+    ))
+
+    srs = _determine_srs(element.attrib.get('srsName'), *srss)
+
+    return {
+        'type': 'MultiPoint',
+        'coordinates': [
+            point['coordinates']
+            for point in points
+        ]
+    }, srs
+
+
+@handle_element('LineString')
+def _parse_linestring_or_linear_ring(element: Element) -> Tuple[GeomDict, str]:
     pos_lists = element.xpath('gml:posList', namespaces=NSMAP)
-    assert pos_lists, 'No gml:posList element'
-    assert len(pos_lists) <= 1, 'Too many gml:posList elements'
+    poss = element.xpath('gml:pos', namespaces=NSMAP)
+    coordinates_elems = element.xpath('gml:coordinates', namespaces=NSMAP)
 
-    pos_lists0 = pos_lists[0]
-    coordinates = parse_poslist(
-        pos_lists0.text,
-        int(pos_lists0.attrib.get('srsDimension', 2))
-    )
+    if pos_lists:
+        if len(pos_lists) > 1:
+            raise ValueError('Too many gml:posList elements')
+
+        pos_list0 = pos_lists[0]
+        coordinates = parse_poslist(
+            pos_list0.text,
+            int(pos_list0.attrib.get('srsDimension', 2))
+        )
+        srs = pos_list0.attrib.get('srsName')
+    elif poss:
+        coordinates = [
+            parse_pos(pos.text)
+            for pos in poss
+        ]
+        srs = _determine_srs(
+            *element.xpath('gml:pos/@srsName', namespaces=NSMAP)
+        )
+    elif coordinates_elems:
+        if not coordinates_elems:
+            raise ValueError(
+                'Neither gml:pos nor gml:coordinates found'
+            )
+        elif len(coordinates_elems) > 1:
+            raise ValueError('Too many gml:coordinates elements')
+
+        coordinates0 = coordinates_elems[0]
+        coordinates = parse_coordinates(
+            coordinates0.text,
+            cs=coordinates0.attrib.get('cs', ','),
+            ts=coordinates0.attrib.get('ts', ' '),
+            decimal=coordinates0.attrib.get('decimal', '.'),
+        )
+        srs = None
+    else:
+        raise ValueError('No gml:posList, gml:pos or gml:coordinates found')
+
+    srs = _determine_srs(element.attrib.get('srsName'), srs)
+
     return {
         'type': 'LineString',
         'coordinates': coordinates
-    }
+    }, srs
 
 
-def _parse_polygon(element: etree._Element) -> dict:
-    exterior_pos_lists = element.xpath(
-        'gml:exterior/gml:LinearRing/gml:posList', namespaces=NSMAP
+@handle_element('MultiCurve')
+def _parse_multi_curve(element: Element) -> Tuple[GeomDict, str]:
+    linestring_elements = element.xpath(
+        '(gml:curveMember|gml:curveMembers)/gml:LineString',
+        namespaces=NSMAP
     )
-    assert exterior_pos_lists, \
-        'No gml:exterior/gml:LinearRing/gml:posList element'
-    assert len(exterior_pos_lists) <= 1, \
-        'Too many gml:exterior/gml:LinearRing/gml:posList elements'
-
-    exterior = parse_poslist(
-        exterior_pos_lists[0].text,
-        int(exterior_pos_lists[0].attrib.get('srsDimension', 2))
+    are_not_linestrings = (
+        etree.QName(e.tag).localname != 'LineString'
+        for e in linestring_elements
     )
-
-    interior_pos_lists = element.xpath(
-        'gml:interior/gml:LinearRing/gml:posList', namespaces=NSMAP
-    )
-    interiors = [
-        parse_poslist(
-            interior_pos_list.text,
-            int(interior_pos_list.attrib.get('srsDimension', 2))
+    if any(are_not_linestrings):
+        raise ValueError(
+            'Only gml:LineString elements are supported for gml:MultiCurves'
         )
-        for interior_pos_list in interior_pos_lists
+
+    linestrings, srss = zip(*(
+        _parse_linestring_or_linear_ring(linestring_element)
+        for linestring_element in linestring_elements
+    ))
+
+    srs = _determine_srs(element.attrib.get('srsName'), *srss)
+
+    return {
+        'type': 'MultiLineString',
+        'coordinates': [
+            linestring['coordinates']
+            for linestring in linestrings
+        ]
+    }, srs
+
+
+@handle_element('Polygon')
+def _parse_polygon(element: Element) -> Tuple[GeomDict, str]:
+    exterior_rings = element.xpath(
+        'gml:exterior/gml:LinearRing', namespaces=NSMAP
+    )
+    if not exterior_rings:
+        raise ValueError('No gml:exterior/gml:LinearRing')
+    elif len(exterior_rings) > 1:
+        raise ValueError('Too many gml:exterior/gml:LinearRing elements')
+
+    exterior, ext_srs = _parse_linestring_or_linear_ring(exterior_rings[0])
+    exterior = exterior['coordinates']
+
+    interior_rings, int_srss = zip(*(
+        _parse_linestring_or_linear_ring(linear_ring)
+        for linear_ring in element.xpath(
+            'gml:interior/gml:LinearRing', namespaces=NSMAP
+        )
+    ))
+    interiors = [
+        ring['coordinates']
+        for ring in interior_rings
     ]
+
+    srs = _determine_srs(element.attrib.get('srsName'), ext_srs, *int_srss)
 
     return {
         'type': 'Polygon',
         'coordinates': [exterior, *interiors]
-    }
+    }, srs
 
 
-def _parse_multi_geometry(element: etree._Element) -> dict:
+@handle_element('MultiSurface')
+def _parse_multi_surface(element: Element) -> Tuple[GeomDict, str]:
+    polygon_elements = element.xpath(
+        '(gml:surfaceMember|gml:surfaceMembers)/gml:Polygon',
+        namespaces=NSMAP
+    )
+    are_not_polygons = (
+        etree.QName(e.tag).localname != 'Polygon' for e in polygon_elements
+    )
+    if any(are_not_polygons):
+        raise ValueError(
+            'Only gml:Polygon elements are supported for gml:MultiSurfaces'
+        )
+
+    polygons, srss = zip(*(
+        _parse_polygon(polygon_element)
+        for polygon_element in polygon_elements
+    ))
+
+    srs = _determine_srs(element.attrib.get('srsName'), *srss)
+
+    return {
+        'type': 'MultiPolygon',
+        'coordinates': [
+            polygon['coordinates']
+            for polygon in polygons
+        ]
+    }, srs
+
+
+@handle_element('MultiGeometry')
+def _parse_multi_geometry(element: Element) -> Tuple[GeomDict, str]:
     sub_elements = element.xpath(
         '(gml:geometryMember|gml:geometryMembers)/*', namespaces=NSMAP
     )
@@ -150,4 +359,4 @@ def _parse_multi_geometry(element: etree._Element) -> dict:
     return {
         'type': 'GeometryCollection',
         'geometries': [parse_v32(sub_element) for sub_element in sub_elements]
-    }
+    }, element.attrib.get('srsName')

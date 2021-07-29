@@ -27,6 +27,22 @@
 
 
 from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
+
+try:
+    from typing import TypedDict
+
+    class GeomDict(TypedDict, total=True):
+        type: str
+        coordinates: Union[Tuple, List]
+        crs: Optional[dict]
+
+except ImportError:
+    GeomDict = dict
+
+# Definition of a coordinate list
+Coordinate = List[float]
+Coordinates = List[Coordinate]
 
 
 @dataclass(frozen=True)
@@ -34,7 +50,7 @@ class Geometry:
     """ Simple container class to hold a geometry and expose it via the
         `__geo_interface__`
     """
-    geometry: dict
+    geometry: GeomDict
 
     @property
     def __geo_interface__(self):
