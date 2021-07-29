@@ -157,9 +157,12 @@ def maybe_swap_coordinates(geometry: GeomDict, srs: str) -> GeomDict:
 def _parse_point(element: Element) -> Tuple[GeomDict, str]:
     positions = element.xpath('gml:pos', namespaces=NSMAP)
     coordinates = element.xpath('gml:coordinates', namespaces=NSMAP)
+    srs = None
     if positions:
-        assert len(positions) == 1, 'Too many gml:pos elements'
+        if len(positions) > 1:
+            raise ValueError('Too many gml:pos elements')
         coords = parse_pos(positions[0].text)
+        srs = positions[0].attrib.get('srsName')
     elif coordinates:
         if len(coordinates) > 1:
             raise ValueError('Too many gml:coordinates elements')
@@ -176,10 +179,11 @@ def _parse_point(element: Element) -> Tuple[GeomDict, str]:
             'Neither gml:pos nor gml:coordinates found'
         )
 
+    srs = _determine_srs(element.attrib.get('srsName'), srs)
     return {
         'type': 'Point',
         'coordinates': coords
-    }, element.attrib.get('srsName')
+    }, srs
 
 
 @handle_element('MultiPoint')
@@ -220,11 +224,11 @@ def _parse_linestring_or_linear_ring(element: Element) -> Tuple[GeomDict, str]:
         srs = pos_list0.attrib.get('srsName')
     elif poss:
         coordinates = [
-            parse_pos(pos)
+            parse_pos(pos.text)
             for pos in poss
         ]
         srs = _determine_srs(
-            *element.xpath('gml:pos@srsName', namespaces=NSMAP)
+            *element.xpath('gml:pos/@srsName', namespaces=NSMAP)
         )
     elif coordinates_elems:
         if not coordinates_elems:
