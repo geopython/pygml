@@ -26,5 +26,9 @@
 # ------------------------------------------------------------------------------
 
 
+NAMESPACE = 'http://www.opengis.net/gml/3.3/ce'
+NSMAP = {'gmlce': NAMESPACE}
+
+
 def parse_v33_ce():
     pass

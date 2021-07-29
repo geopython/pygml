@@ -26,5 +26,9 @@
 # ------------------------------------------------------------------------------
 
 
+NAMESPACE = 'http://www.opengis.net/gml'
+NSMAP = {'gml': NAMESPACE}
+
+
 def parse_pre_v32():
     pass

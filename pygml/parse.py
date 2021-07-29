@@ -29,10 +29,11 @@
 from typing import Union
 from lxml import etree
 
-from .pre_v32 import parse_pre_v32
-from .v32 import parse_v32
-from .v33 import parse_v33_ce
-from .geometry import Geometry
+from .georss import NAMESPACE as NAMESPACE_GEORSS, parse_georss
+from .pre_v32 import NAMESPACE as NAMESPACE_PRE_v32, parse_pre_v32
+from .v32 import NAMESPACE as NAMESPACE_32, parse_v32
+from .v33 import NAMESPACE as NAMESPACE_33_CE, parse_v33_ce
+from .types import Geometry
 
 
 def parse(source: Union[etree._Element, str]) -> Geometry:
@@ -45,11 +46,13 @@ def parse(source: Union[etree._Element, str]) -> Geometry:
         element = etree.fromstring(source)
 
     namespace = etree.QName(element.tag).namespace
-    if namespace == 'http://www.opengis.net/gml':
+    if namespace == NAMESPACE_PRE_v32:
         result = parse_pre_v32(element)
-    elif namespace == 'http://www.opengis.net/gml/3.2':
+    elif namespace == NAMESPACE_32:
         result = parse_v32(element)
-    elif namespace == 'http://www.opengis.net/gml/3.3/ce':
+    elif namespace == NAMESPACE_33_CE:
         result = parse_v33_ce(element)
+    elif namespace == NAMESPACE_GEORSS:
+        result = parse_georss(element)
 
     return Geometry(result)
