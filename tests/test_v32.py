@@ -27,6 +27,7 @@
 
 
 from lxml import etree
+import pytest
 
 from pygml.v32 import parse_v32
 
@@ -52,48 +53,818 @@ def test_parse_point():
     )
     assert result == {'type': 'Point', 'coordinates': (1.0, 1.0)}
 
-
-def test_parse_linestring():
+    # axis order swapping with srsName in pos or Point
     result = parse_v32(
         etree.fromstring("""
-        <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
-            <gml:posList>1.0 1.0</gml:posList>
-        </gml:LineString>
+            <gml:Point gml:id="ID"
+                    xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:pos srsName="EPSG:4326">2.0 1.0</gml:pos>
+            </gml:Point>
         """)
     )
-    assert result == {'type': 'LineString', 'coordinates': [
-        (1.0, 1.0),
-    ]}
+    assert result == {
+        'type': 'Point',
+        'coordinates': (1.0, 2.0),
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:Point gml:id="ID"
+                    xmlns:gml="http://www.opengis.net/gml/3.2"
+                    srsName="EPSG:4326">
+                <gml:coordinates>2.0 1.0</gml:coordinates>
+            </gml:Point>
+        """)
+    )
+    assert result == {
+        'type': 'Point',
+        'coordinates': (1.0, 2.0),
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    # conflicting srsName
+    with pytest.raises(ValueError):
+        parse_v32(
+            etree.fromstring("""
+                <gml:Point gml:id="ID"
+                        xmlns:gml="http://www.opengis.net/gml/3.2"
+                        srsName="EPSG:3875">
+                    <gml:pos srsName="EPSG:4326">2.0 1.0</gml:pos>
+                </gml:Point>
+            """)
+        )
+
+
+def test_parse_multi_point():
+    # using gml:pointMember
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiPoint gml:id="ID"
+                    xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:pointMember>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>1.0 1.0</gml:pos>
+                    </gml:Point>
+                </gml:pointMember>
+                <gml:pointMember>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>2.0 2.0</gml:pos>
+                    </gml:Point>
+                </gml:pointMember>
+            </gml:MultiPoint>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPoint',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ]
+    }
+
+    # using gml:pointMembers
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiPoint gml:id="ID"
+                    xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:pointMembers>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>1.0 1.0</gml:pos>
+                    </gml:Point>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>2.0 2.0</gml:pos>
+                    </gml:Point>
+                </gml:pointMembers>
+            </gml:MultiPoint>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPoint',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ]
+    }
+
+    # using gml:pointMember and gml:pointMembers
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiPoint gml:id="ID"
+                    xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:pointMembers>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>1.0 1.0</gml:pos>
+                    </gml:Point>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>2.0 2.0</gml:pos>
+                    </gml:Point>
+                </gml:pointMembers>
+                <gml:pointMember>
+                    <gml:Point gml:id="ID">
+                        <gml:pos>3.0 3.0</gml:pos>
+                    </gml:Point>
+                </gml:pointMember>
+            </gml:MultiPoint>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPoint',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+            (3.0, 3.0),
+        ]
+    }
+
+    # conflicting srsName
+    with pytest.raises(ValueError):
+        parse_v32(
+            etree.fromstring("""
+                <gml:MultiPoint gml:id="ID"
+                        xmlns:gml="http://www.opengis.net/gml/3.2"
+                        srsName="EPSG:4326">
+                    <gml:pointMembers>
+                        <gml:Point gml:id="ID" srsName="EPSG:3857">
+                            <gml:pos>1.0 1.0</gml:pos>
+                        </gml:Point>
+                        <gml:Point gml:id="ID">
+                            <gml:pos>2.0 2.0</gml:pos>
+                        </gml:Point>
+                    </gml:pointMembers>
+                </gml:MultiPoint>
+            """)
+        )
+
+
+def test_parse_linestring():
+    # from gml:posList
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+            </gml:LineString>
+        """)
+    )
+    assert result == {
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ]
+    }
+
+    # from gml:pos elements
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:pos>1.0 1.0</gml:pos>
+                <gml:pos>2.0 2.0</gml:pos>
+            </gml:LineString>
+        """)
+    )
+    assert result == {
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ]
+    }
+
+    # from gml:coordinates
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:coordinates>1.0 1.0,2.0 2.0</gml:coordinates>
+            </gml:LineString>
+        """)
+    )
+    assert result == {
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ]
+    }
+
+    # from gml:pos elements with srsName
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:pos srsName="EPSG:4326">1.0 1.0</gml:pos>
+                <gml:pos>2.0 2.0</gml:pos>
+            </gml:LineString>
+        """)
+    )
+    assert result == {
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    # from gml:posList element with srsName
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:posList srsName="EPSG:4326">1.0 1.0 2.0 2.0</gml:posList>
+            </gml:LineString>
+        """)
+    )
+    assert result == {
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    # from gml:coordinates element with srsName
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2"
+                    srsName="EPSG:4326">
+                <gml:coordinates>1.0 1.0,2.0 2.0</gml:coordinates>
+            </gml:LineString>
+        """)
+    )
+    assert result == {
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 1.0),
+            (2.0, 2.0),
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    # srsName conflict
+    with pytest.raises(ValueError):
+        parse_v32(
+            etree.fromstring("""
+                <gml:LineString xmlns:gml="http://www.opengis.net/gml/3.2"
+                        srsName="EPSG:4326">
+                    <gml:posList srsName="EPSG:3857">
+                        1.0 1.0 2.0 2.0
+                    </gml:posList>
+                </gml:LineString>
+            """)
+        )
+
+
+def test_parse_multi_curve():
+    # using gml:curveMember elements
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiCurve xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:curveMember>
+                    <gml:LineString>
+                        <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMember>
+                <gml:curveMember>
+                    <gml:LineString>
+                        <gml:posList>3.0 3.0 4.0 4.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMember>
+            </gml:MultiCurve>
+        """)
+    )
+    assert result == {
+        'type': 'MultiLineString',
+        'coordinates': [
+            [(1.0, 1.0), (2.0, 2.0)],
+            [(3.0, 3.0), (4.0, 4.0)],
+        ]
+    }
+
+    # using gml:curveMembers element
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiCurve xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:curveMembers>
+                    <gml:LineString>
+                        <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+                    </gml:LineString>
+                    <gml:LineString>
+                        <gml:posList>3.0 3.0 4.0 4.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMembers>
+            </gml:MultiCurve>
+        """)
+    )
+    assert result == {
+        'type': 'MultiLineString',
+        'coordinates': [
+            [(1.0, 1.0), (2.0, 2.0)],
+            [(3.0, 3.0), (4.0, 4.0)],
+        ]
+    }
+
+    # determine srsName from MultiCurve
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiCurve xmlns:gml="http://www.opengis.net/gml/3.2"
+                    srsName="EPSG:4326">
+                <gml:curveMember>
+                    <gml:LineString>
+                        <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMember>
+                <gml:curveMember>
+                    <gml:LineString>
+                        <gml:posList>3.0 3.0 4.0 4.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMember>
+            </gml:MultiCurve>
+        """)
+    )
+    assert result == {
+        'type': 'MultiLineString',
+        'coordinates': [
+            [(1.0, 1.0), (2.0, 2.0)],
+            [(3.0, 3.0), (4.0, 4.0)],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    # determine srsName from first LineString
+    result = parse_v32(
+        etree.fromstring("""
+            <gml:MultiCurve xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:curveMember>
+                    <gml:LineString srsName="EPSG:4326">
+                        <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMember>
+                <gml:curveMember>
+                    <gml:LineString>
+                        <gml:posList>3.0 3.0 4.0 4.0</gml:posList>
+                    </gml:LineString>
+                </gml:curveMember>
+            </gml:MultiCurve>
+        """)
+    )
+    assert result == {
+        'type': 'MultiLineString',
+        'coordinates': [
+            [(1.0, 1.0), (2.0, 2.0)],
+            [(3.0, 3.0), (4.0, 4.0)],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    # srsName conflict
+    with pytest.raises(ValueError):
+        parse_v32(
+            etree.fromstring("""
+                <gml:MultiCurve xmlns:gml="http://www.opengis.net/gml/3.2">
+                    <gml:curveMember>
+                        <gml:LineString srsName="EPSG:4326">
+                            <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+                        </gml:LineString>
+                    </gml:curveMember>
+                    <gml:curveMember>
+                        <gml:LineString srsName="EPSG:3857">
+                            <gml:posList>3.0 3.0 4.0 4.0</gml:posList>
+                        </gml:LineString>
+                    </gml:curveMember>
+                </gml:MultiCurve>
+            """)
+        )
+
+    with pytest.raises(ValueError):
+        parse_v32(
+            etree.fromstring("""
+                <gml:MultiCurve xmlns:gml="http://www.opengis.net/gml/3.2"
+                        srsName="EPSG:3857">
+                    <gml:curveMember>
+                        <gml:LineString srsName="EPSG:4326">
+                            <gml:posList>1.0 1.0 2.0 2.0</gml:posList>
+                        </gml:LineString>
+                    </gml:curveMember>
+                    <gml:curveMember>
+                        <gml:LineString>
+                            <gml:posList>3.0 3.0 4.0 4.0</gml:posList>
+                        </gml:LineString>
+                    </gml:curveMember>
+                </gml:MultiCurve>
+            """)
+        )
 
 
 def test_parse_polygon():
+    # using gml:posList
     result = parse_v32(
         etree.fromstring("""
         <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
             <gml:exterior>
                 <gml:LinearRing>
-                    <gml:posList>1.0 1.0</gml:posList>
+                    <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0</gml:posList>
                 </gml:LinearRing>
             </gml:exterior>
             <gml:interior>
                 <gml:LinearRing>
-                    <gml:posList>1.0 1.0</gml:posList>
+                    <gml:posList>0.2 0.2 0.5 0.2 0.2 0.5 0.2 0.2</gml:posList>
                 </gml:LinearRing>
             </gml:interior>
         </gml:Polygon>
         """)
     )
-    assert result == {'type': 'Polygon', 'coordinates': [
-        [(1.0, 1.0)],
-        [(1.0, 1.0)],
-    ]}
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+            ],
+            [
+                (0.2, 0.2), (0.5, 0.2), (0.2, 0.5), (0.2, 0.2)
+            ],
+        ]
+    }
+
+    # using gml:pos elements
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:pos>0.0 0.0</gml:pos>
+                    <gml:pos>1.0 0.0</gml:pos>
+                    <gml:pos>0.0 1.0</gml:pos>
+                    <gml:pos>0.0 0.0</gml:pos>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:pos>0.2 0.2</gml:pos>
+                    <gml:pos>0.5 0.2</gml:pos>
+                    <gml:pos>0.2 0.5</gml:pos>
+                    <gml:pos>0.2 0.2</gml:pos>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+            ],
+            [
+                (0.2, 0.2), (0.5, 0.2), (0.2, 0.5), (0.2, 0.2)
+            ],
+        ]
+    }
+
+    # using gml:coordinates
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:coordinates>0.0 0.0,1.0 0.0,0.0 1.0,0.0 0.0
+                    </gml:coordinates>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:coordinates>0.2 0.2,0.5 0.2,0.2 0.5,0.2 0.2
+                    </gml:coordinates>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+            ],
+            [
+                (0.2, 0.2), (0.5, 0.2), (0.2, 0.5), (0.2, 0.2)
+            ],
+        ]
+    }
+
+    # using gml:posList with srsName
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Polygon xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:posList
+                        srsName="EPSG:4326">0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:posList
+                        srsName="EPSG:4326">0.2 0.2 0.5 0.2 0.2 0.5 0.2 0.2
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (0.0, 0.0)
+            ],
+            [
+                (0.2, 0.2), (0.2, 0.5), (0.5, 0.2), (0.2, 0.2)
+            ],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+
+def test_parse_multi_polygon():
+    # using gml:surfaceMember elements
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:MultiSurface xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:surfaceMember>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>0.2 0.2 0.5 0.2 0.2 0.5 0.2 0.2
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:surfaceMember>
+            <gml:surfaceMember>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.0 10.0 11.0 10.0 10.0 11.0 10.0 10.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.2 10.2 10.5 10.2 10.2 10.5 10.2 10.2
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:surfaceMember>
+        </gml:MultiSurface>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPolygon',
+        'coordinates': [
+            [
+                [
+                    (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+                ],
+                [
+                    (0.2, 0.2), (0.5, 0.2), (0.2, 0.5), (0.2, 0.2)
+                ],
+            ],
+            [
+                [
+                    (10.0, 10.0), (11.0, 10.0), (10.0, 11.0), (10.0, 10.0)
+                ],
+                [
+                    (10.2, 10.2), (10.5, 10.2), (10.2, 10.5), (10.2, 10.2)
+                ],
+            ]
+        ]
+    }
+
+    # using gml:surfaceMembers
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:MultiSurface xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:surfaceMembers>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>0.2 0.2 0.5 0.2 0.2 0.5 0.2 0.2
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.0 10.0 11.0 10.0 10.0 11.0 10.0 10.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.2 10.2 10.5 10.2 10.2 10.5 10.2 10.2
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:surfaceMembers>
+        </gml:MultiSurface>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPolygon',
+        'coordinates': [
+            [
+                [
+                    (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+                ],
+                [
+                    (0.2, 0.2), (0.5, 0.2), (0.2, 0.5), (0.2, 0.2)
+                ],
+            ],
+            [
+                [
+                    (10.0, 10.0), (11.0, 10.0), (10.0, 11.0), (10.0, 10.0)
+                ],
+                [
+                    (10.2, 10.2), (10.5, 10.2), (10.2, 10.5), (10.2, 10.2)
+                ],
+            ]
+        ]
+    }
+
+    # using gml:surfaceMembers with srsName
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:MultiSurface xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:surfaceMembers>
+                <gml:Polygon srsName="EPSG:4326">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>0.2 0.2 0.5 0.2 0.2 0.5 0.2 0.2
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.0 10.0 11.0 10.0 10.0 11.0 10.0 10.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.2 10.2 10.5 10.2 10.2 10.5 10.2 10.2
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:surfaceMembers>
+        </gml:MultiSurface>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPolygon',
+        'coordinates': [
+            [
+                [
+                    (0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (0.0, 0.0)
+                ],
+                [
+                    (0.2, 0.2), (0.2, 0.5), (0.5, 0.2), (0.2, 0.2)
+                ],
+            ],
+            [
+                [
+                    (10.0, 10.0), (10.0, 11.0), (11.0, 10.0), (10.0, 10.0)
+                ],
+                [
+                    (10.2, 10.2), (10.2, 10.5), (10.5, 10.2), (10.2, 10.2)
+                ],
+            ]
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+    with pytest.raises(ValueError):
+        parse_v32(
+            etree.fromstring("""
+            <gml:MultiSurface xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:surfaceMembers>
+                    <gml:Polygon srsName="EPSG:4326">
+                        <gml:exterior>
+                            <gml:LinearRing>
+                                <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0
+                                </gml:posList>
+                            </gml:LinearRing>
+                        </gml:exterior>
+                        <gml:interior>
+                            <gml:LinearRing>
+                                <gml:posList>0.2 0.2 0.5 0.2 0.2 0.5 0.2 0.2
+                                </gml:posList>
+                            </gml:LinearRing>
+                        </gml:interior>
+                    </gml:Polygon>
+                    <gml:Polygon>
+                        <gml:exterior>
+                            <gml:LinearRing>
+                                <gml:posList srsName="EPSG:3857">
+                                    10.0 10.0 11.0 10.0 10.0 11.0 10.0 10.0
+                                </gml:posList>
+                            </gml:LinearRing>
+                        </gml:exterior>
+                        <gml:interior>
+                            <gml:LinearRing>
+                                <gml:posList>
+                                    10.2 10.2 10.5 10.2 10.2 10.5 10.2 10.2
+                                </gml:posList>
+                            </gml:LinearRing>
+                        </gml:interior>
+                    </gml:Polygon>
+                </gml:surfaceMembers>
+            </gml:MultiSurface>
+            """)
+        )
 
 
 def test_parse_multi_geometry():
     # using geometryMembers
     result = parse_v32(
         etree.fromstring("""
-        <gml:MultiGeometry gml:id="ID"  xmlns:gml="http://www.opengis.net/gml/3.2">
+        <gml:MultiGeometry gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2">
             <gml:geometryMembers>
                 <gml:Point gml:id="ID">
                     <gml:pos>1.0 1.0</gml:pos>
@@ -135,7 +906,8 @@ def test_parse_multi_geometry():
     # using geometryMember
     result = parse_v32(
         etree.fromstring("""
-        <gml:MultiGeometry gml:id="ID"  xmlns:gml="http://www.opengis.net/gml/3.2">
+        <gml:MultiGeometry gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2">
             <gml:geometryMember>
                 <gml:Point gml:id="ID">
                     <gml:pos>1.0 1.0</gml:pos>
@@ -172,6 +944,62 @@ def test_parse_multi_geometry():
                     [(1.0, 1.0)],
                     [(1.0, 1.0)],
                 ]
+            },
+        ]
+    }
+
+    # allow varying srsNames
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:MultiGeometry gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:geometryMembers>
+                <gml:Point srsName="EPSG:4326" gml:id="ID">
+                    <gml:pos>1.0 1.0</gml:pos>
+                </gml:Point>
+                <gml:Polygon srsName="EPSG:3857"
+                        xmlns:gml="http://www.opengis.net/gml/3.2">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>1.0 1.0</gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>1.0 1.0</gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:geometryMembers>
+        </gml:MultiGeometry>
+        """)
+    )
+
+    assert result == {
+        'type': 'GeometryCollection',
+        'geometries': [
+            {
+                'type': 'Point',
+                'coordinates': (1.0, 1.0),
+                'crs': {
+                    'type': 'name',
+                    'properties': {
+                        'name': 'EPSG:4326'
+                    }
+                }
+            },
+            {
+                'type': 'Polygon',
+                'coordinates': [
+                    [(1.0, 1.0)],
+                    [(1.0, 1.0)],
+                ],
+                'crs': {
+                    'type': 'name',
+                    'properties': {
+                        'name': 'EPSG:3857'
+                    }
+                }
             },
         ]
     }

@@ -25,12 +25,12 @@
 # THE SOFTWARE.
 # ------------------------------------------------------------------------------
 
-from typing import Callable, List, Dict, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from lxml import etree
 
 from .basics import (
-    Coordinates, parse_coordinates, parse_pos, parse_poslist,
+    parse_coordinates, parse_pos, parse_poslist,
     swap_coordinates_xy
 )
 from .axisorder import is_crs_yx
@@ -45,9 +45,17 @@ Element = etree._Element
 Elements = List[Element]
 
 
-def _determine_srs(srss: List[Optional[str]]) -> Optional[str]:
-    # TODO
-    pass
+def _determine_srs(*srss: List[Optional[str]]) -> Optional[str]:
+    srss = set(srss)
+    if None in srss:
+        srss.remove(None)
+
+    if len(srss) > 1:
+        raise ValueError(f'Conflicting SRS definitions: {", ".join(srss)}')
+    try:
+        return srss.pop()
+    except KeyError:
+        return None
 
 
 _HANDLERS = {}
@@ -57,6 +65,7 @@ def handle_element(tag_localname: str) -> Callable:
     """ Decorator to register a handler function for an XML tag localname """
     def inner(func: Callable[[Element], Tuple[GeomDict, str]]):
         _HANDLERS[tag_localname] = func
+        return func
 
     return inner
 
@@ -148,9 +157,12 @@ def maybe_swap_coordinates(geometry: GeomDict, srs: str) -> GeomDict:
 def _parse_point(element: Element) -> Tuple[GeomDict, str]:
     positions = element.xpath('gml:pos', namespaces=NSMAP)
     coordinates = element.xpath('gml:coordinates', namespaces=NSMAP)
+    srs = None
     if positions:
-        assert len(positions) == 1, 'Too many gml:pos elements'
+        if len(positions) > 1:
+            raise ValueError('Too many gml:pos elements')
         coords = parse_pos(positions[0].text)
+        srs = positions[0].attrib.get('srsName')
     elif coordinates:
         if len(coordinates) > 1:
             raise ValueError('Too many gml:coordinates elements')
@@ -167,10 +179,11 @@ def _parse_point(element: Element) -> Tuple[GeomDict, str]:
             'Neither gml:pos nor gml:coordinates found'
         )
 
+    srs = _determine_srs(element.attrib.get('srsName'), srs)
     return {
         'type': 'Point',
         'coordinates': coords
-    }, element.attrib.get('srsName')
+    }, srs
 
 
 @handle_element('MultiPoint')
@@ -182,7 +195,7 @@ def _parse_multi_point(element: Element) -> Tuple[GeomDict, str]:
         )
     ))
 
-    srs = _determine_srs([element.attrib.get('srsName')] + srss)
+    srs = _determine_srs(element.attrib.get('srsName'), *srss)
 
     return {
         'type': 'MultiPoint',
@@ -211,11 +224,11 @@ def _parse_linestring_or_linear_ring(element: Element) -> Tuple[GeomDict, str]:
         srs = pos_list0.attrib.get('srsName')
     elif poss:
         coordinates = [
-            parse_pos(pos)
+            parse_pos(pos.text)
             for pos in poss
         ]
         srs = _determine_srs(
-            element.xpath('gml:pos@srsName', namespaces=NSMAP)
+            *element.xpath('gml:pos/@srsName', namespaces=NSMAP)
         )
     elif coordinates_elems:
         if not coordinates_elems:
@@ -236,7 +249,7 @@ def _parse_linestring_or_linear_ring(element: Element) -> Tuple[GeomDict, str]:
     else:
         raise ValueError('No gml:posList, gml:pos or gml:coordinates found')
 
-    srs = _determine_srs([element.attrib.get('srsName'), srs])
+    srs = _determine_srs(element.attrib.get('srsName'), srs)
 
     return {
         'type': 'LineString',
@@ -264,7 +277,7 @@ def _parse_multi_curve(element: Element) -> Tuple[GeomDict, str]:
         for linestring_element in linestring_elements
     ))
 
-    srs = _determine_srs([element.attrib.get('srsName')] + srss)
+    srs = _determine_srs(element.attrib.get('srsName'), *srss)
 
     return {
         'type': 'MultiLineString',
@@ -299,7 +312,7 @@ def _parse_polygon(element: Element) -> Tuple[GeomDict, str]:
         for ring in interior_rings
     ]
 
-    srs = _determine_srs([element.attrib.get('srsName')] + ext_srs + int_srss)
+    srs = _determine_srs(element.attrib.get('srsName'), ext_srs, *int_srss)
 
     return {
         'type': 'Polygon',
@@ -326,7 +339,7 @@ def _parse_multi_surface(element: Element) -> Tuple[GeomDict, str]:
         for polygon_element in polygon_elements
     ))
 
-    srs = _determine_srs([element.attrib.get('srsName')] + srss)
+    srs = _determine_srs(element.attrib.get('srsName'), *srss)
 
     return {
         'type': 'MultiPolygon',
