@@ -29,7 +29,9 @@
 from lxml import etree
 import pytest
 
-from pygml.v32 import parse_v32
+from pygml.v32 import encode_v32, parse_v32
+
+from .util import compare_trees
 
 
 def test_parse_point():
@@ -1003,3 +1005,530 @@ def test_parse_multi_geometry():
             },
         ]
     }
+
+
+def test_encode_v32_point():
+    # encode Point
+    result = encode_v32({'type': 'Point', 'coordinates': (1.0, 2.0)}, 'ID')
+    expected = etree.fromstring("""
+        <gml:Point gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:pos>1.0 2.0</gml:pos>
+        </gml:Point>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode Point with EPSG:4326
+    result = encode_v32({
+        'type': 'Point',
+        'coordinates': (1.0, 2.0),
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:Point gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="EPSG:4326">
+            <gml:pos>2.0 1.0</gml:pos>
+        </gml:Point>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+
+def test_encode_v32_multi_point():
+    # encode MultiPoint
+    result = encode_v32({
+        'type': 'MultiPoint',
+        'coordinates': [
+            (1.0, 2.0),
+            (3.0, 4.0),
+        ]
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:MultiPoint gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:geometryMembers>
+                <gml:Point gml:id="ID_0">
+                    <gml:pos>1.0 2.0</gml:pos>
+                </gml:Point>
+                <gml:Point gml:id="ID_1">
+                    <gml:pos>3.0 4.0</gml:pos>
+                </gml:Point>
+            </gml:geometryMembers>
+        </gml:MultiPoint>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode MultiPoint with EPSG:4326
+    result = encode_v32({
+        'type': 'MultiPoint',
+        'coordinates': [
+            (1.0, 2.0),
+            (3.0, 4.0),
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:MultiPoint gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="EPSG:4326">
+            <gml:geometryMembers>
+                <gml:Point gml:id="ID_0">
+                    <gml:pos>2.0 1.0</gml:pos>
+                </gml:Point>
+                <gml:Point gml:id="ID_1">
+                    <gml:pos>4.0 3.0</gml:pos>
+                </gml:Point>
+            </gml:geometryMembers>
+        </gml:MultiPoint>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+
+def test_encode_v32_linestring():
+    # encode LineString
+    result = encode_v32({
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 2.0),
+            (3.0, 4.0),
+        ],
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:LineString gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:posList>1.0 2.0 3.0 4.0</gml:posList>
+        </gml:LineString>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode LineString with EPSG:4326
+    result = encode_v32({
+        'type': 'LineString',
+        'coordinates': [
+            (1.0, 2.0),
+            (3.0, 4.0),
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:LineString gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="EPSG:4326">
+            <gml:posList>2.0 1.0 4.0 3.0</gml:posList>
+        </gml:LineString>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+
+def test_encode_v32_polygon():
+    # encode LineString
+    result = encode_v32({
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 2.0),
+                (1.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 2.0),
+                (1.0, 2.0),
+            ], [
+                (1.4, 2.4),
+                (1.4, 2.6),
+                (1.6, 2.6),
+                (1.6, 2.4),
+                (1.4, 2.4),
+            ],
+        ],
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:Polygon gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:posList>
+                        1.0 2.0 1.0 3.0 2.0 3.0 2.0 2.0 1.0 2.0
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:posList>
+                        1.4 2.4 1.4 2.6 1.6 2.6 1.6 2.4 1.4 2.4
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode LineString with EPSG:4326
+    result = encode_v32({
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 2.0),
+                (1.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 2.0),
+                (1.0, 2.0),
+            ], [
+                (1.4, 2.4),
+                (1.4, 2.6),
+                (1.6, 2.6),
+                (1.6, 2.4),
+                (1.4, 2.4),
+            ],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:Polygon gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="EPSG:4326">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:posList>
+                        2.0 1.0 3.0 1.0 3.0 2.0 2.0 2.0 2.0 1.0
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:posList>
+                        2.4 1.4 2.6 1.4 2.6 1.6 2.4 1.6 2.4 1.4
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+
+def test_encode_v32_multi_polygon():
+    # encode LineString
+    result = encode_v32({
+        'type': 'MultiPolygon',
+        'coordinates': [
+            [
+                [
+                    (1.0, 2.0),
+                    (1.0, 3.0),
+                    (2.0, 3.0),
+                    (2.0, 2.0),
+                    (1.0, 2.0),
+                ], [
+                    (1.4, 2.4),
+                    (1.4, 2.6),
+                    (1.6, 2.6),
+                    (1.6, 2.4),
+                    (1.4, 2.4),
+                ],
+            ], [
+                [
+                    (11.0, 12.0),
+                    (11.0, 13.0),
+                    (12.0, 13.0),
+                    (12.0, 12.0),
+                    (11.0, 12.0),
+                ], [
+                    (11.4, 12.4),
+                    (11.4, 12.6),
+                    (11.6, 12.6),
+                    (11.6, 12.4),
+                    (11.4, 12.4),
+                ],
+            ],
+        ],
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:MultiSurface gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:surfaceMembers>
+                <gml:Polygon gml:id="ID_0">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                1.0 2.0 1.0 3.0 2.0 3.0 2.0 2.0 1.0 2.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                1.4 2.4 1.4 2.6 1.6 2.6 1.6 2.4 1.4 2.4
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+                <gml:Polygon gml:id="ID_1">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                            11.0 12.0 11.0 13.0 12.0 13.0 12.0 12.0 11.0 12.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                            11.4 12.4 11.4 12.6 11.6 12.6 11.6 12.4 11.4 12.4
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:surfaceMembers>
+        </gml:MultiSurface>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode LineString with EPSG:4326
+    result = encode_v32({
+        'type': 'MultiPolygon',
+        'coordinates': [
+            [
+                [
+                    (1.0, 2.0),
+                    (1.0, 3.0),
+                    (2.0, 3.0),
+                    (2.0, 2.0),
+                    (1.0, 2.0),
+                ], [
+                    (1.4, 2.4),
+                    (1.4, 2.6),
+                    (1.6, 2.6),
+                    (1.6, 2.4),
+                    (1.4, 2.4),
+                ],
+            ], [
+                [
+                    (11.0, 12.0),
+                    (11.0, 13.0),
+                    (12.0, 13.0),
+                    (12.0, 12.0),
+                    (11.0, 12.0),
+                ], [
+                    (11.4, 12.4),
+                    (11.4, 12.6),
+                    (11.6, 12.6),
+                    (11.6, 12.4),
+                    (11.4, 12.4),
+                ],
+            ],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:MultiSurface gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="EPSG:4326">
+            <gml:surfaceMembers>
+                <gml:Polygon gml:id="ID_0">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                2.0 1.0 3.0 1.0 3.0 2.0 2.0 2.0 2.0 1.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                2.4 1.4 2.6 1.4 2.6 1.6 2.4 1.6 2.4 1.4
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+                <gml:Polygon gml:id="ID_1">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                            12.0 11.0 13.0 11.0 13.0 12.0 12.0 12.0 12.0 11.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                            12.4 11.4 12.6 11.4 12.6 11.6 12.4 11.6 12.4 11.4
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:surfaceMembers>
+        </gml:MultiSurface>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+
+def test_encode_v32_geometry_collection():
+    result = encode_v32({
+        'type': 'GeometryCollection',
+        'geometries': [
+            {
+                'type': 'Point',
+                'coordinates': (1.0, 2.0),
+            },
+            {
+                'type': 'Polygon',
+                'coordinates': [
+                    [
+                        (1.0, 2.0),
+                        (1.0, 3.0),
+                        (2.0, 3.0),
+                        (2.0, 2.0),
+                        (1.0, 2.0),
+                    ], [
+                        (1.4, 2.4),
+                        (1.4, 2.6),
+                        (1.6, 2.6),
+                        (1.6, 2.4),
+                        (1.4, 2.4),
+                    ],
+                ],
+            },
+        ]
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:MultiGeometry gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:geometryMembers>
+                <gml:Point gml:id="ID_0"
+                        srsName="urn:ogc:def:crs:OGC::CRS84">
+                    <gml:pos>1.0 2.0</gml:pos>
+                </gml:Point>
+                <gml:Polygon gml:id="ID_1"
+                        srsName="urn:ogc:def:crs:OGC::CRS84">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                1.0 2.0 1.0 3.0 2.0 3.0 2.0 2.0 1.0 2.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                1.4 2.4 1.4 2.6 1.6 2.6 1.6 2.4 1.4 2.4
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:geometryMembers>
+        </gml:MultiGeometry>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    result = encode_v32({
+        'type': 'GeometryCollection',
+        'geometries': [
+            {
+                'type': 'Point',
+                'coordinates': (1.0, 2.0),
+                'crs': {
+                    'type': 'name',
+                    'properties': {
+                        'name': 'EPSG:4326'
+                    }
+                }
+            },
+            {
+                'type': 'Polygon',
+                'coordinates': [
+                    [
+                        (1.0, 2.0),
+                        (1.0, 3.0),
+                        (2.0, 3.0),
+                        (2.0, 2.0),
+                        (1.0, 2.0),
+                    ], [
+                        (1.4, 2.4),
+                        (1.4, 2.6),
+                        (1.6, 2.6),
+                        (1.6, 2.4),
+                        (1.4, 2.4),
+                    ],
+                ],
+                'crs': {
+                    'type': 'name',
+                    'properties': {
+                        'name': 'EPSG:4326'
+                    }
+                }
+            },
+        ]
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:MultiGeometry gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:geometryMembers>
+                <gml:Point gml:id="ID_0"
+                        srsName="EPSG:4326">
+                    <gml:pos>2.0 1.0</gml:pos>
+                </gml:Point>
+                <gml:Polygon gml:id="ID_1"
+                        srsName="EPSG:4326">
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                2.0 1.0 3.0 1.0 3.0 2.0 2.0 2.0 2.0 1.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                    <gml:interior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                2.4 1.4 2.6 1.4 2.6 1.6 2.4 1.6 2.4 1.4
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:interior>
+                </gml:Polygon>
+            </gml:geometryMembers>
+        </gml:MultiGeometry>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'

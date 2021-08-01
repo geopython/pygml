@@ -1,6 +1,36 @@
-import re
+# ------------------------------------------------------------------------------
+#
+# Project: pygml <https://github.com/geopython/pygml>
+# Authors: Fabian Schindler <fabian.schindler@eox.at>
+#
+# ------------------------------------------------------------------------------
+# Copyright (C) 2021 EOX IT Services GmbH
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of this Software or works derived from this Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+# ------------------------------------------------------------------------------
 
-# copied from https://github.com/geopython/OWSLib/blob/a9c1be25676ab530fd0327c2450922f288ca25f4/owslib/crs.py
+
+import re
+from typing import Union
+
+# copied from:
+# https://github.com/geopython/OWSLib/blob/a9c1be25676ab530fd0327c2450922f288ca25f4/owslib/crs.py
 AXISORDER_YX = {
     4326, 4258, 31466, 31467, 31468, 31469, 2166, 2167, 2168, 2036, 2044, 2045,
     2065, 2081, 2082, 2083, 2085, 2086, 2091, 2092, 2093, 2096, 2097, 2098,
@@ -158,22 +188,40 @@ RE_CRS_CODE = re.compile(
     r'http://www\.opengis\.net/gml/srs/epsg\.xml\#|'
     r'urn:EPSG:geographicCRS:|'
     r'urn:ogc:def:crs:EPSG::|'
-    r'urn:ogc:def:crs:EPSG:)([0-9]+)'
+    r'urn:ogc:def:crs:OGC::|'
+    r'urn:ogc:def:crs:EPSG:)([0-9]+|CRS84)'
 )
 
 
-def is_crs_yx(crs: str) -> bool:
-    """
+def get_crs_code(crs: str) -> Union[int, str]:
+    """ Extract the CRS code from the given CRS identifier string,
+        which can be one of:
           * EPSG:<EPSG code>
           * http://www.opengis.net/def/crs/EPSG/0/<EPSG code> (URI Style 1)
           * http://www.opengis.net/gml/srs/epsg.xml#<EPSG code> (URI Style 2)
           * urn:EPSG:geographicCRS:<epsg code>
           * urn:ogc:def:crs:EPSG::<EPSG code>
+          * urn:ogc:def:crs:OGC::<EPSG code>
           * urn:ogc:def:crs:EPSG:<EPSG code>
+
+        Returns the code as an integer in case of EPSG code or as the
+        string 'CRS84'
     """
     match = RE_CRS_CODE.match(crs)
     if not match:
         raise ValueError('Failed to retrieve CRS code')
 
-    code = int(match.groups()[1])
+    value_group = match.groups()[1]
+
+    try:
+        return int(value_group)
+    except ValueError:
+        return value_group
+
+
+def is_crs_yx(crs: str) -> bool:
+    """ Determines whether the given CRS uses Y/X (or latitude/longitude)
+        axis order.
+    """
+    code = get_crs_code(crs)
     return code in AXISORDER_YX
