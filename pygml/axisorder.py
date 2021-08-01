@@ -27,6 +27,7 @@
 
 
 import re
+from typing import Union
 
 # copied from:
 # https://github.com/geopython/OWSLib/blob/a9c1be25676ab530fd0327c2450922f288ca25f4/owslib/crs.py
@@ -192,14 +193,19 @@ RE_CRS_CODE = re.compile(
 )
 
 
-def is_crs_yx(crs: str) -> bool:
-    """
+def get_crs_code(crs: str) -> Union[int, str]:
+    """ Extract the CRS code from the given CRS identifier string,
+        which can be one of:
           * EPSG:<EPSG code>
           * http://www.opengis.net/def/crs/EPSG/0/<EPSG code> (URI Style 1)
           * http://www.opengis.net/gml/srs/epsg.xml#<EPSG code> (URI Style 2)
           * urn:EPSG:geographicCRS:<epsg code>
           * urn:ogc:def:crs:EPSG::<EPSG code>
+          * urn:ogc:def:crs:OGC::<EPSG code>
           * urn:ogc:def:crs:EPSG:<EPSG code>
+
+        Returns the code as an integer in case of EPSG code or as the
+        string 'CRS84'
     """
     match = RE_CRS_CODE.match(crs)
     if not match:
@@ -207,9 +213,15 @@ def is_crs_yx(crs: str) -> bool:
 
     value_group = match.groups()[1]
 
-    # special handling of CRS84 (EPSG:4326 but with lon/lat order)
-    if value_group == 'CRS84':
-        return False
+    try:
+        return int(value_group)
+    except ValueError:
+        return value_group
 
-    code = int(value_group)
+
+def is_crs_yx(crs: str) -> bool:
+    """ Determines whether the given CRS uses Y/X (or latitude/longitude)
+        axis order.
+    """
+    code = get_crs_code(crs)
     return code in AXISORDER_YX
