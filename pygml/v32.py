@@ -28,13 +28,14 @@
 from typing import Callable, List, Optional, Tuple
 
 from lxml import etree
+from lxml.builder import ElementMaker
 
 from .basics import (
     parse_coordinates, parse_pos, parse_poslist,
     swap_coordinates_xy
 )
 from .axisorder import is_crs_yx
-from .types import GeomDict
+from .types import Coordinates, GeomDict
 
 
 NAMESPACE = 'http://www.opengis.net/gml/3.2'
@@ -146,7 +147,7 @@ def maybe_swap_coordinates(geometry: GeomDict, srs: str) -> GeomDict:
                     for line in polygon
                 ] for polygon in coordinates
             ]
-        # GeometryCollection are
+
         geometry['coordinates'] = coordinates
         return geometry
     else:
@@ -360,3 +361,159 @@ def _parse_multi_geometry(element: Element) -> Tuple[GeomDict, str]:
         'type': 'GeometryCollection',
         'geometries': [parse_v32(sub_element) for sub_element in sub_elements]
     }, element.attrib.get('srsName')
+
+
+GML = ElementMaker(namespace=NAMESPACE, nsmap=NSMAP)
+
+
+def _encode_pos_list(coordinates: Coordinates) -> Element:
+    return GML(
+        'posList',
+        ' '.join(
+            ' '.join(str(c) for c in coordinate)
+            for coordinate in coordinates
+        )
+    )
+
+
+def encode_v32(geometry: GeomDict, identifier: str) -> Element:
+    """ Encodes the given GeoJSON dict to its most simple GML 3.2
+        representation. As in GML 3.2 the gml:id attribute is mandatory,
+        the identifier must be passed as well.
+
+        In preparation of the encoding, the coordinates may have to be
+        swapped from XY order to YX order, depending on the used CRS.
+        This includes the case when no CRS is specified, as this means
+        the default WGS84 in GeoJSON, which in turn uses
+        latitude/longitude ordering GML.
+
+        This function returns an ``lxml.etree._Element`` which can be
+        altered or serialized.
+    """
+    crs = geometry.get('crs')
+    srs = None
+    id_attr = {f'{{{NAMESPACE}}}id': identifier}
+    if crs:
+        srs = crs.get('properties', {}).get('name')
+    else:
+        # GeoJSON is by default in CRS84
+        srs = 'urn:ogc:def:crs:OGC::CRS84'
+    attrs = {
+        'srsName': srs,
+        **id_attr
+    }
+    geometry = maybe_swap_coordinates(geometry, srs)
+
+    type_ = geometry['type']
+    # GeometryCollections have no coordinates
+    coordinates = geometry.get('coordinates')
+    if type_ == 'Point':
+        return GML(
+            'Point',
+            GML('pos', ' '.join(str(c) for c in coordinates)),
+            **attrs
+        )
+
+    elif type_ == 'MultiPoint':
+        return GML(
+            'MultiPoint',
+            GML('geometryMembers', *[
+                GML(
+                    'Point',
+                    GML('pos', ' '.join(str(c) for c in coordinate)),
+                    **{f'{{{NAMESPACE}}}id': f'{identifier}_{i}'}
+                )
+                for i, coordinate in enumerate(coordinates)
+            ]),
+            **attrs
+        )
+
+    elif type_ == 'LineString':
+        return GML(
+            'LineString',
+            _encode_pos_list(coordinates),
+            **attrs
+        )
+
+    elif type_ == 'MultiLineString':
+        return GML(
+            'MultiCurve',
+            GML(
+                'curveMembers', *[
+                    GML(
+                        'LineString',
+                        _encode_pos_list(linestring),
+                        **{f'{{{NAMESPACE}}}id': f'{identifier}_{i}'}
+                    )
+                    for i, linestring in enumerate(coordinates)
+                ]
+            ),
+            **attrs
+        )
+
+    elif type_ == 'Polygon':
+        return GML(
+            'Polygon',
+            GML(
+                'exterior',
+                GML(
+                    'LinearRing',
+                    _encode_pos_list(coordinates[0]),
+                )
+            ), *[
+                GML(
+                    'interior',
+                    GML(
+                        'LinearRing',
+                        _encode_pos_list(linear_ring),
+                    )
+                )
+                for linear_ring in coordinates[1:]
+            ],
+            **attrs
+        )
+
+    elif type_ == 'MultiPolygon':
+        return GML(
+            'MultiSurface',
+            GML(
+                'surfaceMembers', *[
+                    GML(
+                        'Polygon',
+                        GML(
+                            'exterior',
+                            GML(
+                                'LinearRing',
+                                _encode_pos_list(polygon[0]),
+                            )
+                        ), *[
+                            GML(
+                                'interior',
+                                GML(
+                                    'LinearRing',
+                                    _encode_pos_list(linear_ring),
+                                )
+                            )
+                            for linear_ring in polygon[1:]
+                        ],
+                        **{f'{{{NAMESPACE}}}id': f'{identifier}_{i}'}
+                    )
+                    for i, polygon in enumerate(coordinates)
+                ]
+            ),
+            **attrs
+        )
+
+    elif type_ == 'GeometryCollection':
+        return GML(
+            'MultiGeometry',
+            GML(
+                'geometryMembers', *[
+                    encode_v32(sub_geometry, f'{identifier}_{i}')
+                    for i, sub_geometry in enumerate(geometry['geometries'])
+                ]
+            ),
+            **id_attr
+        )
+
+    raise ValueError(f'Unable to encode geometry of type {type_}')
