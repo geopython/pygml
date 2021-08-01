@@ -1,6 +1,21 @@
 import pytest
 
-from pygml.axisorder import is_crs_yx
+from pygml.axisorder import is_crs_yx, get_crs_code
+
+
+def test_get_crs_code():
+    # test with a reversed code
+    assert get_crs_code('EPSG:4326') == 4326
+    assert get_crs_code('http://www.opengis.net/def/crs/EPSG/0/4326') == 4326
+    assert get_crs_code('http://www.opengis.net/gml/srs/epsg.xml#4326') == 4326
+    assert get_crs_code('urn:EPSG:geographicCRS:4326') == 4326
+    assert get_crs_code('urn:ogc:def:crs:EPSG::4326') == 4326
+    assert get_crs_code('urn:ogc:def:crs:EPSG:4326') == 4326
+    assert get_crs_code('urn:ogc:def:crs:OGC::CRS84') == 'CRS84'
+
+    # test with some garbage format
+    with pytest.raises(ValueError):
+        get_crs_code('abcd:4326')
 
 
 def test_is_crs_yx():

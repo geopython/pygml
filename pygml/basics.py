@@ -51,6 +51,19 @@ def parse_coordinates(value: str, cs: str = ',', ts: str = ' ',
     """ Parses the the values of a gml:coordinates node to a list of
         lists of floats. Takes the coordinate separator and tuple
         separator into account, and also custom decimal separators.
+
+        >>> parse_coordinates('12.34 56.7,89.10 11.12')
+        [(12.34, 56.7), (89.1, 11.12)]
+        >>> parse_coordinates('12.34 56.7;89.10 11.12', cs=';')
+        [(12.34, 56.7), (89.1, 11.12)]
+        >>> parse_coordinates('12.34:56.7,89.10:11.12', ts=':')
+        [(12.34, 56.7), (89.1, 11.12)]
+        >>> parse_coordinates('12.34:56.7;89.10:11.12', cs=';', ts=':')
+        [(12.34, 56.7), (89.1, 11.12)]
+        >>> parse_coordinates(
+        ...     '12,34:56,7;89,10:11,12', cs=';', ts=':', decimal=','
+        ... )
+        [(12.34, 56.7), (89.1, 11.12)]
     """
 
     number_parser = _make_number_parser(decimal)
@@ -67,6 +80,15 @@ def parse_coordinates(value: str, cs: str = ',', ts: str = ' ',
 def parse_poslist(value: str, dimensions: int = 2) -> Coordinates:
     """ Parses the value of a single gml:posList to a `Coordinates`
         structure.
+
+        >>> parse_poslist('12.34 56.7 89.10 11.12')
+        [(12.34, 56.7), (89.1, 11.12)]
+        >>> parse_poslist('12.34 56.7 89.10 11.12 13.14 15.16', dimensions=3)
+        [(12.34, 56.7, 89.1), (11.12, 13.14, 15.16)]
+        >>> parse_poslist('12.34 56.7 89.10 11.12', dimensions=3)
+        Traceback (most recent call last):
+            ...
+        ValueError: Invalid dimensionality of pos list
     """
     raw = [float(v) for v in value.split()]
     if len(raw) % dimensions > 0:
@@ -80,18 +102,37 @@ def parse_poslist(value: str, dimensions: int = 2) -> Coordinates:
 
 def parse_pos(value: str) -> Coordinate:
     """ Parses a single gml:pos to a `Coordinate` structure.
+
+        >>> parse_pos('12.34 56.7')
+        (12.34, 56.7)
+        >>> parse_pos('12.34 56.7 89.10')
+        (12.34, 56.7, 89.1)
     """
     return tuple(float(v) for v in value.split())
 
 
 def swap_coordinate_xy(coordinate: Coordinate) -> Coordinate:
     """ Swaps the X and Y coordinates of a given coordinate
+
+        >>> swap_coordinate_xy((12.34, 56.7))
+        (56.7, 12.34)
+        >>> swap_coordinate_xy((12.34, 56.7, 89.10))
+        (56.7, 12.34, 89.1)
     """
     return (coordinate[1], coordinate[0], *coordinate[2:])
 
 
 def swap_coordinates_xy(coordinates: Coordinates) -> Coordinates:
     """ Swaps the X and Y coordinates of a given coordinates list
+
+        >>> swap_coordinates_xy(
+        ...     [(12.34, 56.7), (89.10, 11.12)]
+        ... )
+        [(56.7, 12.34), (11.12, 89.1)]
+        >>> swap_coordinates_xy(
+        ...     [(12.34, 56.7, 89.10), (11.12, 13.14, 15.16)]
+        ... )
+        [(56.7, 12.34, 89.1), (13.14, 11.12, 15.16)]
     """
     return [
         (coordinate[1], coordinate[0], *coordinate[2:])

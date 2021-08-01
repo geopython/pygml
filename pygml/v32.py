@@ -96,7 +96,7 @@ def parse_v32(element: Element) -> GeomDict:
             field, a 'coordinates' field and potentially a 'crs' field
             when the geometries SRS could be determined. This field
             follows the structure laid out in the
-            [draft for GeoJSON](https://gist.github.com/sgillies/1233327).
+            `draft for GeoJSON <https://gist.github.com/sgillies/1233327>`_.
     """
     qname = etree.QName(element.tag)
     if qname.namespace != NAMESPACE:
@@ -389,6 +389,18 @@ def encode_v32(geometry: GeomDict, identifier: str) -> Element:
 
         This function returns an ``lxml.etree._Element`` which can be
         altered or serialized.
+
+        >>> from pygml.v32 import encode_v32
+        >>> from lxml import etree
+        >>> tree = encode_v32({
+        ...     'type': 'Point',
+        ...     'coordinates': (1.0, 1.0)
+        ... }, 'ID')
+        >>> print(etree.tostring(tree, pretty_print=True).decode())
+        <gml:Point xmlns:gml="http://www.opengis.net/gml/3.2"
+            srsName="urn:ogc:def:crs:OGC::CRS84" gml:id="ID">
+          <gml:pos>1.0 1.0</gml:pos>
+        </gml:Point>
     """
     crs = geometry.get('crs')
     srs = None

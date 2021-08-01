@@ -196,16 +196,25 @@ RE_CRS_CODE = re.compile(
 def get_crs_code(crs: str) -> Union[int, str]:
     """ Extract the CRS code from the given CRS identifier string,
         which can be one of:
-          * EPSG:<EPSG code>
-          * http://www.opengis.net/def/crs/EPSG/0/<EPSG code> (URI Style 1)
-          * http://www.opengis.net/gml/srs/epsg.xml#<EPSG code> (URI Style 2)
-          * urn:EPSG:geographicCRS:<epsg code>
-          * urn:ogc:def:crs:EPSG::<EPSG code>
-          * urn:ogc:def:crs:OGC::<EPSG code>
-          * urn:ogc:def:crs:EPSG:<EPSG code>
+          * ``EPSG:<EPSG code>``
+          * ``http://www.opengis.net/def/crs/EPSG/0/<EPSG code>``
+          * ``http://www.opengis.net/gml/srs/epsg.xml#<EPSG code>``
+          * ``urn:EPSG:geographicCRS:<epsg code>``
+          * ``urn:ogc:def:crs:EPSG::<EPSG code>``
+          * ``urn:ogc:def:crs:OGC::<EPSG code>``
+          * ``urn:ogc:def:crs:EPSG:<EPSG code>``
 
         Returns the code as an integer in case of EPSG code or as the
-        string 'CRS84'
+        string ``'CRS84'``.
+
+        >>> get_crs_code('EPSG:4326')
+        4326
+        >>> get_crs_code('urn:ogc:def:crs:OGC::CRS84')
+        'CRS84'
+        >>> get_crs_code('something')
+        Traceback (most recent call last):
+            ...
+        ValueError: Failed to retrieve CRS code
     """
     match = RE_CRS_CODE.match(crs)
     if not match:
@@ -222,6 +231,13 @@ def get_crs_code(crs: str) -> Union[int, str]:
 def is_crs_yx(crs: str) -> bool:
     """ Determines whether the given CRS uses Y/X (or latitude/longitude)
         axis order.
+
+        >>> is_crs_yx('EPSG:4326')
+        True
+        >>> is_crs_yx('EPSG:3857')
+        False
+        >>> is_crs_yx('urn:ogc:def:crs:OGC::CRS84')
+        False
     """
     code = get_crs_code(crs)
     return code in AXISORDER_YX

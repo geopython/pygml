@@ -37,6 +37,44 @@ def get_dimensionality(geometry: GeomDict) -> Optional[int]:
         and using its length.
         When no coordinates can be retrieved (e.g: in case of
         GeometryCollections) None is returned.
+
+        >>> get_dimensionality({
+        ...     'type': 'Polygon',
+        ...     'coordinates': [
+        ...         [
+        ...             (0.5, 1.0),
+        ...             (0.5, 2.0),
+        ...             (1.5, 2.0),
+        ...             (1.5, 1.0),
+        ...             (0.5, 1.0)
+        ...         ]
+        ...     ]
+        ... })
+        2
+        >>> get_dimensionality({
+        ...     'type': 'MultiPoint',
+        ...     'coordinates': [
+        ...         (1.0, 1.0, 1.0),
+        ...         (2.0, 2.0, 1.0),
+        ...     ]
+        ... })
+        3
+        >>> get_dimensionality({
+        ...     'type': 'GeometryCollection',
+        ...     'geometries': [
+        ...         {
+        ...             'type': 'Point',
+        ...             'coordinates': (1.0, 1.0)
+        ...         },
+        ...         {
+        ...             'type': 'Polygon',
+        ...             'coordinates': [
+        ...                 [(1.0, 1.0)],
+        ...                 [(1.0, 1.0)],
+        ...             ]
+        ...         },
+        ...     ]
+        ... })
     """
 
     coordinates = geometry.get('coordinates')

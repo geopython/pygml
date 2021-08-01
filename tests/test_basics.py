@@ -1,7 +1,8 @@
 import pytest
 
 from pygml.basics import (
-    parse_coordinates, parse_poslist, parse_pos, swap_coordinates_xy
+    parse_coordinates, parse_poslist, parse_pos, swap_coordinate_xy,
+    swap_coordinates_xy
 )
 
 
@@ -55,6 +56,16 @@ def test_parse_pos():
     # 3D pos
     result = parse_pos('12.34 56.7 89.10')
     assert result == (12.34, 56.7, 89.10)
+
+
+def test_swap_coordinate_xy():
+    # basic test
+    swapped = swap_coordinate_xy((12.34, 56.7))
+    assert swapped == (56.7, 12.34)
+
+    # 3D coords, only X/Y are to be swapped
+    swapped = swap_coordinate_xy((12.34, 56.7, 89.10))
+    assert swapped == (56.7, 12.34, 89.10)
 
 
 def test_swap_coordinates_xy():

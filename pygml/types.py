@@ -41,14 +41,14 @@ except ImportError:
     GeomDict = dict
 
 # Definition of a coordinate list
-Coordinate = List[float]
+Coordinate = Tuple[float, ...]
 Coordinates = List[Coordinate]
 
 
 @dataclass(frozen=True)
 class Geometry:
     """ Simple container class to hold a geometry and expose it via the
-        `__geo_interface__`
+        ``__geo_interface__`` property
     """
     geometry: GeomDict
 
