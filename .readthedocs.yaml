@@ -11,6 +11,7 @@ sphinx:
 
 # Optionally set requirements required to build your docs
 python:
+   version: "3.8"
    install:
    - requirements: docs/requirements.txt
    - requirements: requirements-test.txt
