@@ -1,4 +1,4 @@
-# Contributing to pygml
+# Contributing
 
 We welcome contributions to pygml, in the form of issues, bug fixes, documentation or suggestions for enhancements. This document sets out our guidelines and best practices for such contributions.
 

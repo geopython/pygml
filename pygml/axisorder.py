@@ -196,13 +196,14 @@ RE_CRS_CODE = re.compile(
 def get_crs_code(crs: str) -> Union[int, str]:
     """ Extract the CRS code from the given CRS identifier string,
         which can be one of:
-          * ``EPSG:<EPSG code>``
-          * ``http://www.opengis.net/def/crs/EPSG/0/<EPSG code>``
-          * ``http://www.opengis.net/gml/srs/epsg.xml#<EPSG code>``
-          * ``urn:EPSG:geographicCRS:<epsg code>``
-          * ``urn:ogc:def:crs:EPSG::<EPSG code>``
-          * ``urn:ogc:def:crs:OGC::<EPSG code>``
-          * ``urn:ogc:def:crs:EPSG:<EPSG code>``
+
+            * ``EPSG:<EPSG code>``
+            * ``http://www.opengis.net/def/crs/EPSG/0/<EPSG code>``
+            * ``http://www.opengis.net/gml/srs/epsg.xml#<EPSG code>``
+            * ``urn:EPSG:geographicCRS:<epsg code>``
+            * ``urn:ogc:def:crs:EPSG::<EPSG code>``
+            * ``urn:ogc:def:crs:OGC::<EPSG code>``
+            * ``urn:ogc:def:crs:EPSG:<EPSG code>``
 
         Returns the code as an integer in case of EPSG code or as the
         string ``'CRS84'``.

@@ -136,11 +136,12 @@ def encode_georss(geometry: GeomDict,
         Tries to use the native GeoRSS elements ``point``, ``line``,
         or ``polygon`` when possible. Falls back to ``georss:where``
         with using the ``gml_encoder`` function (defaulting to GML 3.2):
-          - MultiPoint, MultiLineString, MultiPolygon geometries
-          - Polygons with interiors
-          - GeometryCollections
-          - any geometry with CRS other than CRS84 or EPSG:4326
-          - when dealing with >2D geometries
+
+            - MultiPoint, MultiLineString, MultiPolygon geometries
+            - Polygons with interiors
+            - GeometryCollections
+            - any geometry with CRS other than CRS84 or EPSG:4326
+            - when dealing with >2D geometries
     """
     type_ = geometry['type']
     coordinates = geometry.get('coordinates')
