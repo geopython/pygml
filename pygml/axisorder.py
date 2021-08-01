@@ -1,6 +1,7 @@
 import re
 
-# copied from https://github.com/geopython/OWSLib/blob/a9c1be25676ab530fd0327c2450922f288ca25f4/owslib/crs.py
+# copied from:
+# https://github.com/geopython/OWSLib/blob/a9c1be25676ab530fd0327c2450922f288ca25f4/owslib/crs.py
 AXISORDER_YX = {
     4326, 4258, 31466, 31467, 31468, 31469, 2166, 2167, 2168, 2036, 2044, 2045,
     2065, 2081, 2082, 2083, 2085, 2086, 2091, 2092, 2093, 2096, 2097, 2098,
@@ -158,7 +159,8 @@ RE_CRS_CODE = re.compile(
     r'http://www\.opengis\.net/gml/srs/epsg\.xml\#|'
     r'urn:EPSG:geographicCRS:|'
     r'urn:ogc:def:crs:EPSG::|'
-    r'urn:ogc:def:crs:EPSG:)([0-9]+)'
+    r'urn:ogc:def:crs:OGC::|'
+    r'urn:ogc:def:crs:EPSG:)([0-9]+|CRS84)'
 )
 
 
@@ -175,5 +177,11 @@ def is_crs_yx(crs: str) -> bool:
     if not match:
         raise ValueError('Failed to retrieve CRS code')
 
-    code = int(match.groups()[1])
+    value_group = match.groups()[1]
+
+    # special handling of CRS84 (EPSG:4326 but with lon/lat order)
+    if value_group == 'CRS84':
+        return False
+
+    code = int(value_group)
     return code in AXISORDER_YX
