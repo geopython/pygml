@@ -26,7 +26,7 @@
 # ------------------------------------------------------------------------------
 
 from pygml.axisorder import get_crs_code
-from typing import List
+from typing import Callable, List
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -127,12 +127,15 @@ def parse_georss(element: Element) -> GeomDict:
 
 GEORSS = ElementMaker(namespace=NAMESPACE, nsmap=NSMAP)
 
+GmlEncoder = Callable[[GeomDict, str], Element]
 
-def encode_georss(geometry: GeomDict) -> Element:
+
+def encode_georss(geometry: GeomDict,
+                  gml_encoder: GmlEncoder = encode_v32) -> Element:
     """ Encodes a GeoJSON geometry as a GeoRSS ``lxml.etree.Element``.
         Tries to use the native GeoRSS elements ``point``, ``line``,
         or ``polygon`` when possible. Falls back to ``georss:where``
-        with a GML v3.2 encoded geometry when in case of:
+        with using the ``gml_encoder`` function (defaulting to GML 3.2):
           - MultiPoint, MultiLineString, MultiPolygon geometries
           - Polygons with interiors
           - GeometryCollections
@@ -141,7 +144,7 @@ def encode_georss(geometry: GeomDict) -> Element:
     """
     type_ = geometry['type']
     coordinates = geometry.get('coordinates')
-    crs = geometry['crs']
+    crs = geometry.get('crs')
     dims = get_dimensionality(geometry)
 
     code = None
@@ -162,7 +165,9 @@ def encode_georss(geometry: GeomDict) -> Element:
             return GEORSS(
                 'line',
                 ' '.join(
-                    str(v) for v in swap_coordinates_xy(coordinates)
+                    ' '.join(
+                        str(v) for v in coordinate
+                    ) for coordinate in swap_coordinates_xy(coordinates)
                 )
             )
 
@@ -172,8 +177,9 @@ def encode_georss(geometry: GeomDict) -> Element:
                 return GEORSS(
                     'polygon',
                     ' '.join(
-                        str(v)
-                        for v in swap_coordinates_xy(coordinates[0])
+                        ' '.join(
+                            str(v) for v in coordinate
+                        ) for coordinate in swap_coordinates_xy(coordinates[0])
                     )
                 )
 
@@ -182,8 +188,8 @@ def encode_georss(geometry: GeomDict) -> Element:
     #   - Polygons with interiors
     #   - GeometryCollections
     #   - any geometry with CRS other than CRS84 or EPSG4326
+    #   - when dealing with >2D geometries
     return GEORSS(
         'where',
-        # TODO: encode in GML 3.1 once available
-        encode_v32(geometry, 'ID')
+        gml_encoder(geometry, 'ID')
     )
