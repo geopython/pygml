@@ -25,16 +25,19 @@
 # THE SOFTWARE.
 # ------------------------------------------------------------------------------
 
+from pygml.axisorder import get_crs_code
 from typing import List
 
 from lxml import etree
+from lxml.builder import ElementMaker
 
 from .basics import (
     parse_pos, parse_poslist, swap_coordinate_xy, swap_coordinates_xy
 )
+from .dimensionality import get_dimensionality
 from .types import GeomDict
 from .pre_v32 import NAMESPACE as NAMESPACE_PRE32, parse_pre_v32
-from .v32 import NAMESPACE as NAMESPACE_32, parse_v32
+from .v32 import NAMESPACE as NAMESPACE_32, encode_v32, parse_v32
 from .v33 import NAMESPACE as NAMESPACE_33_CE, parse_v33_ce
 
 
@@ -120,3 +123,67 @@ def parse_georss(element: Element) -> GeomDict:
         result['bbox'] = bbox
 
     return result
+
+
+GEORSS = ElementMaker(namespace=NAMESPACE, nsmap=NSMAP)
+
+
+def encode_georss(geometry: GeomDict) -> Element:
+    """ Encodes a GeoJSON geometry as a GeoRSS ``lxml.etree.Element``.
+        Tries to use the native GeoRSS elements ``point``, ``line``,
+        or ``polygon`` when possible. Falls back to ``georss:where``
+        with a GML v3.2 encoded geometry when in case of:
+          - MultiPoint, MultiLineString, MultiPolygon geometries
+          - Polygons with interiors
+          - GeometryCollections
+          - any geometry with CRS other than CRS84 or EPSG:4326
+          - when dealing with >2D geometries
+    """
+    type_ = geometry['type']
+    coordinates = geometry.get('coordinates')
+    crs = geometry['crs']
+    dims = get_dimensionality(geometry)
+
+    code = None
+    if crs:
+        crs_name = crs.get('properties', {}).get('name')
+        code = get_crs_code(crs_name)
+
+    if code in (None, 4326, 'CRS84') and dims == 2:
+        if type_ == 'Point':
+            return GEORSS(
+                'point',
+                ' '.join(
+                    str(v) for v in swap_coordinate_xy(coordinates)
+                )
+            )
+
+        elif type_ == 'LineString':
+            return GEORSS(
+                'line',
+                ' '.join(
+                    str(v) for v in swap_coordinates_xy(coordinates)
+                )
+            )
+
+        elif type_ == 'Polygon':
+            # only exterior
+            if len(coordinates) == 1:
+                return GEORSS(
+                    'polygon',
+                    ' '.join(
+                        str(v)
+                        for v in swap_coordinates_xy(coordinates[0])
+                    )
+                )
+
+    # fall back to GML encoding when we have:
+    #   - MultiPoint, MultiLineString, MultiPolygon geometries
+    #   - Polygons with interiors
+    #   - GeometryCollections
+    #   - any geometry with CRS other than CRS84 or EPSG4326
+    return GEORSS(
+        'where',
+        # TODO: encode in GML 3.1 once available
+        encode_v32(geometry, 'ID')
+    )
