@@ -14,7 +14,7 @@ $ pip install pygml
 
 ## Features
 
-Parse GML 3.1, 3.2, compact encoded GML 3.3 and GeoRSS geometries to a [`__geo_interface__`](https://gist.github.com/sgillies/2217756) compliant class.
+Parse GML 3.1, 3.2, compact encoded GML 3.3 and GeoRSS geometries to a [Geo Interface](https://gist.github.com/sgillies/2217756) compliant class.
 
 
 ```python

@@ -22,11 +22,10 @@ Before submitting a bug, please do the following:
 
 * Perform __basic troubleshooting__ steps:
 
-    * __Make sure you're on the latest version.__ If you're not on the most
+    * Make sure you're on the latest version. If you're not on the most
       recent version, your problem may have been solved already! Upgrading is
       always the best first step.
-    * [__Search the issue
-      tracker__](https://github.com/geopython/pygml/issues)
+    * [Search the issue tracker](https://github.com/geopython/pygml/issues)
       to make sure it's not a known issue.
 
 ### What to put in your bug report
