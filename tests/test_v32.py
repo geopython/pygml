@@ -628,6 +628,101 @@ def test_parse_polygon():
     }
 
 
+def test_parse_envelope():
+    # using gml:lowerCorner/gml:upperCorner
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Envelope xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:lowerCorner>0.0 1.0</gml:lowerCorner>
+            <gml:upperCorner>2.0 3.0</gml:upperCorner>
+        </gml:Envelope>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 1.0),
+                (0.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 1.0),
+                (0.0, 1.0),
+            ],
+        ]
+    }
+
+    # using gml:pos elements
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Envelope xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:pos>0.0 1.0</gml:pos>
+            <gml:pos>2.0 3.0</gml:pos>
+        </gml:Envelope>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 1.0),
+                (0.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 1.0),
+                (0.0, 1.0),
+            ],
+        ]
+    }
+
+    # using gml:coordinates
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Envelope xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:coordinates>0.0 1.0,2.0 3.0</gml:coordinates>
+        </gml:Envelope>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 1.0),
+                (0.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 1.0),
+                (0.0, 1.0),
+            ],
+        ]
+    }
+
+    # using gml:lowerCorner/gml:upperCorner with srsName
+    result = parse_v32(
+        etree.fromstring("""
+        <gml:Envelope xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:lowerCorner srsName="EPSG:4326">0.0 1.0</gml:lowerCorner>
+            <gml:upperCorner srsName="EPSG:4326">2.0 3.0</gml:upperCorner>
+        </gml:Envelope>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 0.0),
+                (3.0, 0.0),
+                (3.0, 2.0),
+                (1.0, 2.0),
+                (1.0, 0.0),
+            ],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }
+
+
 def test_parse_multi_polygon():
     # using gml:surfaceMember elements
     result = parse_v32(

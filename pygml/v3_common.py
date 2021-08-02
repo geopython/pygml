@@ -26,7 +26,6 @@
 # ------------------------------------------------------------------------------
 
 
-from pygml.v32 import NSMAP
 from typing import Callable, List, Optional, Tuple, Dict
 
 from lxml import etree
@@ -109,7 +108,7 @@ def parse_point(element: Element, nsmap: NameSpaceMap) -> ParseResult:
 
 def parse_multi_point(element: Element, nsmap: NameSpaceMap) -> ParseResult:
     points, srss = zip(*(
-        parse_point(point_elem)
+        parse_point(point_elem, nsmap)
         for point_elem in element.xpath(
             '(gml:pointMember|gml:pointMembers)/*', namespaces=nsmap
         )
@@ -195,7 +194,7 @@ def parse_multi_curve(element: Element, nsmap: NameSpaceMap) -> ParseResult:
         )
 
     linestrings, srss = zip(*(
-        parse_linestring_or_linear_ring(linestring_element)
+        parse_linestring_or_linear_ring(linestring_element, nsmap)
         for linestring_element in linestring_elements
     ))
 
@@ -217,7 +216,7 @@ def parse_multi_linestring(element: Element,
         namespaces=nsmap
     )
     linestrings, srss = zip(*(
-        parse_linestring_or_linear_ring(linestring_element)
+        parse_linestring_or_linear_ring(linestring_element, nsmap)
         for linestring_element in linestring_elements
     ))
 
@@ -279,7 +278,7 @@ def parse_multi_surface(element: Element, nsmap: NameSpaceMap) -> ParseResult:
         )
 
     polygons, srss = zip(*(
-        parse_polygon(polygon_element)
+        parse_polygon(polygon_element, nsmap)
         for polygon_element in polygon_elements
     ))
 
@@ -301,7 +300,7 @@ def parse_multi_polygon(element: Element, nsmap: NameSpaceMap) -> ParseResult:
     )
 
     polygons, srss = zip(*(
-        parse_polygon(polygon_element)
+        parse_polygon(polygon_element, nsmap)
         for polygon_element in polygon_elements
     ))
 
@@ -316,13 +315,79 @@ def parse_multi_polygon(element: Element, nsmap: NameSpaceMap) -> ParseResult:
     }, srs
 
 
+def parse_envelope(element: Element, nsmap: NameSpaceMap) -> ParseResult:
+    lower = element.xpath('gml:lowerCorner', namespaces=nsmap)
+    upper = element.xpath('gml:upperCorner', namespaces=nsmap)
+    pos_elems = element.xpath('gml:pos', namespaces=nsmap)
+    coordinates = element.xpath('gml:coordinates', namespaces=nsmap)
+    coords = element.xpath('gml:coord', namespaces=nsmap)
+
+    if lower and upper:
+        lower = lower[0]
+        upper = upper[0]
+        srs = determine_srs(
+            lower.attrib.get('srsName'),
+            upper.attrib.get('srsName')
+        )
+        lower = parse_pos(lower.text)
+        upper = parse_pos(upper.text)
+
+    elif pos_elems:
+        lower, upper = [
+            parse_pos(pos_elem.text)
+            for pos_elem in pos_elems
+        ]
+        srs = determine_srs(*(
+            pos_elem.attrib.get('srsName') for pos_elem in pos_elems
+        ))
+
+    elif coordinates:
+        coordinates0 = coordinates[0]
+        lower, upper = parse_coordinates(
+            coordinates0.text,
+            cs=coordinates0.attrib.get('cs', ','),
+            ts=coordinates0.attrib.get('ts', ' '),
+            decimal=coordinates0.attrib.get('decimal', '.'),
+        )
+        srs = None
+
+    elif coords:
+        lower, upper = [
+            parse_coord(coord)
+            for coord in coords
+        ]
+        srs = None
+
+    else:
+        raise ValueError(
+            'Missing gml:lowerCorner, gml:upperCorner, gml:pos or '
+            'gml:coordinates.'
+        )
+
+    lx, ly = lower
+    hx, hy = upper
+
+    return {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (lx, ly),
+                (lx, hy),
+                (hx, hy),
+                (hx, ly),
+                (lx, ly),
+            ]
+        ]
+    }, srs
+
+
 SubParser = Callable[[Element], GeomDict]
 
 
-def parse_multi_geometry(element: Element,
+def parse_multi_geometry(element: Element, nsmap: NameSpaceMap,
                          geometry_parser: SubParser) -> ParseResult:
     sub_elements = element.xpath(
-        '(gml:geometryMember|gml:geometryMembers)/*', namespaces=NSMAP
+        '(gml:geometryMember|gml:geometryMembers)/*', namespaces=nsmap
     )
 
     return {
