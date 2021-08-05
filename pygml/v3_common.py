@@ -29,17 +29,87 @@
 from typing import Callable, List, Optional, Tuple, Dict
 
 from lxml import etree
+from lxml.builder import ElementMaker
 
+from .axisorder import is_crs_yx
 from .basics import (
-    parse_coordinates, parse_pos, parse_poslist,
+    parse_coordinates, parse_pos, parse_poslist, swap_coordinates_xy
 )
-from .types import Coordinate, GeomDict
+from .types import Coordinate, Coordinates, GeomDict
 
 # type aliases
 NameSpaceMap = Dict[str, str]
 Element = etree._Element
 Elements = List[Element]
 ParseResult = Tuple[GeomDict, str]
+HandlerFunc = Callable[[Element, NameSpaceMap], ParseResult]
+
+
+class GML3Parser:
+    def __init__(self, namespace: str, nsmap: NameSpaceMap,
+                 handlers: Dict[str, HandlerFunc]):
+        self.namespace = namespace
+        self.nsmap = nsmap
+        self.handlers = handlers
+
+    def parse(self, element: Element) -> GeomDict:
+        qname = etree.QName(element.tag)
+        if qname.namespace != self.namespace:
+            raise ValueError(f'Namespace {qname.namespace} is not supported')
+
+        # get a registered handler function
+        handler = self.handlers.get(qname.localname)
+        if not handler:
+            raise ValueError(
+                f'XML nodes of type {qname.localname} are not supported.'
+            )
+
+        # parse the geometry
+        if qname.localname == 'MultiGeometry':
+            geometry, srs = handler(element, self.nsmap, self.parse)
+        else:
+            geometry, srs = handler(element, self.nsmap)
+
+        # handle SRS: maybe swap YX ordered coordinates to XY
+        # and store the SRS as a crs field in the geometry
+        if srs:
+            geometry = maybe_swap_coordinates(geometry, srs)
+            geometry['crs'] = {
+                'type': 'name',
+                'properties': {
+                    'name': srs
+                }
+            }
+
+        return geometry
+
+
+def maybe_swap_coordinates(geometry: GeomDict, srs: str) -> GeomDict:
+    if is_crs_yx(srs):
+        type_ = geometry['type']
+        coordinates = geometry['coordinates']
+
+        if type_ == 'Point':
+            coordinates = (coordinates[1], coordinates[0], *coordinates[2:])
+        elif type_ in ('MultiPoint', 'LineString'):
+            coordinates = swap_coordinates_xy(coordinates)
+        elif type_ in ('MultiLineString', 'Polygon'):
+            coordinates = [
+                swap_coordinates_xy(line)
+                for line in coordinates
+            ]
+        elif type_ == 'MultiPolygon':
+            coordinates = [
+                [
+                    swap_coordinates_xy(line)
+                    for line in polygon
+                ] for polygon in coordinates
+            ]
+
+        geometry['coordinates'] = coordinates
+        return geometry
+    else:
+        return geometry
 
 
 def determine_srs(*srss: List[Optional[str]]) -> Optional[str]:
@@ -397,3 +467,160 @@ def parse_multi_geometry(element: Element, nsmap: NameSpaceMap,
             for sub_element in sub_elements
         ]
     }, element.attrib.get('srsName')
+
+
+class GML3Encoder:
+    def __init__(self, namespace: str, nsmap: NameSpaceMap, id_required: bool):
+        self.namespace = namespace
+        self.nsmap = nsmap
+        self.id_required = id_required
+        self.gml = ElementMaker(namespace=namespace, nsmap=nsmap)
+
+    def encode(self, geometry: GeomDict, identifier: str = None) -> Element:
+        if not identifier and self.id_required:
+            raise TypeError(
+                "Missing 1 required positional argument: 'identifier'"
+            )
+
+        gml = self.gml
+        crs = geometry.get('crs')
+        srs = None
+        if identifier:
+            id_attr = {f'{{{self.namespace}}}id': identifier}
+        else:
+            id_attr = {}
+
+        if crs:
+            srs = crs.get('properties', {}).get('name')
+        else:
+            # GeoJSON is by default in CRS84
+            srs = 'urn:ogc:def:crs:OGC::CRS84'
+        attrs = {
+            'srsName': srs,
+            **id_attr
+        }
+        geometry = maybe_swap_coordinates(geometry, srs)
+
+        type_ = geometry['type']
+        # GeometryCollections have no coordinates
+        coordinates = geometry.get('coordinates')
+        if type_ == 'Point':
+            return gml(
+                'Point',
+                gml('pos', ' '.join(str(c) for c in coordinates)),
+                **attrs
+            )
+
+        elif type_ == 'MultiPoint':
+            return gml(
+                'MultiPoint',
+                gml('geometryMembers', *[
+                    gml(
+                        'Point',
+                        gml('pos', ' '.join(str(c) for c in coordinate)),
+                        **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
+                    )
+                    for i, coordinate in enumerate(coordinates)
+                ]),
+                **attrs
+            )
+
+        elif type_ == 'LineString':
+            return gml(
+                'LineString',
+                self._encode_pos_list(coordinates),
+                **attrs
+            )
+
+        elif type_ == 'MultiLineString':
+            return gml(
+                'MultiCurve',
+                gml(
+                    'curveMembers', *[
+                        gml(
+                            'LineString',
+                            self._encode_pos_list(linestring),
+                            **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
+                        )
+                        for i, linestring in enumerate(coordinates)
+                    ]
+                ),
+                **attrs
+            )
+
+        elif type_ == 'Polygon':
+            return gml(
+                'Polygon',
+                gml(
+                    'exterior',
+                    gml(
+                        'LinearRing',
+                        self._encode_pos_list(coordinates[0]),
+                    )
+                ), *[
+                    gml(
+                        'interior',
+                        gml(
+                            'LinearRing',
+                            self._encode_pos_list(linear_ring),
+                        )
+                    )
+                    for linear_ring in coordinates[1:]
+                ],
+                **attrs
+            )
+
+        elif type_ == 'MultiPolygon':
+            return gml(
+                'MultiSurface',
+                gml(
+                    'surfaceMembers', *[
+                        gml(
+                            'Polygon',
+                            gml(
+                                'exterior',
+                                gml(
+                                    'LinearRing',
+                                    self._encode_pos_list(polygon[0]),
+                                )
+                            ), *[
+                                gml(
+                                    'interior',
+                                    gml(
+                                        'LinearRing',
+                                        self._encode_pos_list(linear_ring),
+                                    )
+                                )
+                                for linear_ring in polygon[1:]
+                            ],
+                            **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
+                        )
+                        for i, polygon in enumerate(coordinates)
+                    ]
+                ),
+                **attrs
+            )
+
+        elif type_ == 'GeometryCollection':
+            geometries = geometry['geometries']
+            return gml(
+                'MultiGeometry',
+                gml(
+                    'geometryMembers', *[
+                        self.encode(sub_geometry, f'{identifier}_{i}')
+                        for i, sub_geometry in enumerate(geometries)
+                    ]
+                ),
+                **id_attr
+            )
+
+        raise ValueError(f'Unable to encode geometry of type {type_}')
+
+    def _encode_pos_list(self, coordinates: Coordinates) -> Element:
+        return self.gml(
+            'posList',
+            ' '.join(
+                ' '.join(str(c) for c in coordinate)
+                for coordinate in coordinates
+            )
+        )

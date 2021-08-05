@@ -26,9 +26,101 @@
 # ------------------------------------------------------------------------------
 
 
+from typing import List
+
+from lxml import etree
+
+from .types import GeomDict
+from .v3_common import (
+    GML3Encoder, GML3Parser, parse_envelope, parse_multi_linestring,
+    parse_multi_polygon, parse_point, parse_linestring_or_linear_ring,
+    parse_multi_curve, parse_polygon, parse_multi_point, parse_multi_surface,
+    parse_multi_geometry,
+)
+
+
 NAMESPACE = 'http://www.opengis.net/gml'
 NSMAP = {'gml': NAMESPACE}
 
 
-def parse_pre_v32():
-    pass
+Element = etree._Element
+Elements = List[Element]
+
+# set up a parser
+GML_PRE32_PARSER = GML3Parser(NAMESPACE, NSMAP, {
+    'Point': parse_point,
+    'MultiPoint': parse_multi_point,
+    'LineString': parse_linestring_or_linear_ring,
+    'MultiLineString': parse_multi_linestring,
+    'MultiCurve': parse_multi_curve,
+    'Polygon': parse_polygon,
+    'Envelope': parse_envelope,
+    'MultiPolygon': parse_multi_polygon,
+    'MultiSurface': parse_multi_surface,
+    'MultiGeometry': parse_multi_geometry,
+})
+
+
+def parse_pre_v32(element: Element) -> GeomDict:
+    """ Main parsing function for GML 3.0 and 3.1 XML structures.
+
+        The following XML tags can be parsed to their respective GeoJSON
+        counterpart:
+
+          - gml:Point -> Point
+          - gml:MultiPoint -> MultiPoint
+          - gml:LineString -> LineString
+          - gml:MultiCurve (with only gml:LineString curve members)
+            -> MultiLineString
+          - gml:MultiLineString -> MultiLineString
+          - gml:Polygon -> Polygon
+          - gml:MultiPolygon -> MultiPolygon
+          - gml:MultiSurface (with only gml:Polygon surface members)
+            -> MultiPolygon
+          - gml:MultiGeometry (with any of the aforementioned types as
+            geometry members) -> GeometryCollection
+
+        The SRS of the geometry is determined and the coordinates are
+        flipped to XY order in GeoJSON when they are in YX order in GML.
+
+        Returns:
+            the parsed GeoJSON geometry as a dict. Contains a 'type'
+            field, a 'coordinates' field and potentially a 'crs' field
+            when the geometries SRS could be determined. This field
+            follows the structure laid out in the
+            `draft for GeoJSON <https://gist.github.com/sgillies/1233327>`_.
+    """
+
+    return GML_PRE32_PARSER.parse(element)
+
+
+GML_PRE32_ENCODER = GML3Encoder(NAMESPACE, NSMAP, True)
+
+
+def encode_pre_v32(geometry: GeomDict, identifier: str = None) -> Element:
+    """ Encodes the given GeoJSON dict to its most simple GML 3
+        representation.
+
+        In preparation of the encoding, the coordinates may have to be
+        swapped from XY order to YX order, depending on the used CRS.
+        This includes the case when no CRS is specified, as this means
+        the default WGS84 in GeoJSON, which in turn uses
+        latitude/longitude ordering GML.
+
+        This function returns an ``lxml.etree._Element`` which can be
+        altered or serialized.
+
+        >>> from pygml.pre_v32 import encode_pre_v32
+        >>> from lxml import etree
+        >>> tree = encode_pre_v32({
+        ...     'type': 'Point',
+        ...     'coordinates': (1.0, 1.0)
+        ... }, 'ID')
+        >>> print(etree.tostring(tree, pretty_print=True).decode())
+        <gml:Point xmlns:gml="http://www.opengis.net/gml"
+            srsName="urn:ogc:def:crs:OGC::CRS84" gml:id="ID">
+          <gml:pos>1.0 1.0</gml:pos>
+        </gml:Point>
+    """
+
+    return GML_PRE32_ENCODER.encode(geometry, identifier)
