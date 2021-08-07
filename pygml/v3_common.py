@@ -46,15 +46,15 @@ HandlerFunc = Callable[[Element, NameSpaceMap], ParseResult]
 
 
 class GML3Parser:
-    def __init__(self, namespace: str, nsmap: NameSpaceMap,
+    def __init__(self, namespaces: List[str], nsmap: NameSpaceMap,
                  handlers: Dict[str, HandlerFunc]):
-        self.namespace = namespace
+        self.namespaces = namespaces
         self.nsmap = nsmap
         self.handlers = handlers
 
     def parse(self, element: Element) -> GeomDict:
         qname = etree.QName(element.tag)
-        if qname.namespace != self.namespace:
+        if qname.namespace not in self.namespaces:
             raise ValueError(f'Namespace {qname.namespace} is not supported')
 
         # get a registered handler function

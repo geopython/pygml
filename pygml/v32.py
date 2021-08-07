@@ -45,7 +45,7 @@ Element = etree._Element
 Elements = List[Element]
 
 # set up a parser
-GML32_PARSER = GML3Parser(NAMESPACE, NSMAP, {
+GML32_PARSER = GML3Parser([NAMESPACE], NSMAP, {
     'Point': parse_point,
     'MultiPoint': parse_multi_point,
     'LineString': parse_linestring_or_linear_ring,
