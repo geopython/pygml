@@ -29,9 +29,9 @@
 from lxml import etree
 # import pytest
 
-from pygml.v33 import parse_v33_ce
+from pygml.v33 import encode_v33_ce, parse_v33_ce
 
-# from .util import compare_trees
+from .util import compare_trees
 
 
 def test_parse_simple_triangle():
@@ -279,3 +279,135 @@ def test_parse_simple_polygon():
             }
         }
     }
+
+
+def test_encode_v32_polygon():
+    # encode Polygon as SimpleTriangle
+    result = encode_v33_ce({
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 2.0),
+                (1.0, 3.0),
+                (2.0, 2.0),
+                (1.0, 2.0),
+            ],
+        ],
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gmlce:SimpleTriangle gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:gmlce="http://www.opengis.net/gml/3.3/ce"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:posList>
+                1.0 2.0 1.0 3.0 2.0 2.0
+            </gml:posList>
+        </gmlce:SimpleTriangle>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode Polygon as SimpleRectangle
+    result = encode_v33_ce({
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 2.0),
+                (1.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 2.0),
+                (1.0, 2.0),
+            ],
+        ],
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gmlce:SimpleRectangle gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:gmlce="http://www.opengis.net/gml/3.3/ce"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:posList>
+                1.0 2.0 1.0 3.0 2.0 3.0 2.0 2.0
+            </gml:posList>
+        </gmlce:SimpleRectangle>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode Polygon as SimplePolygon when more than 4 distinct
+    # coordinates and no interiors (with EPSG:4326)
+    result = encode_v33_ce({
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 2.0),
+                (1.0, 3.0),
+                (1.5, 3.5),
+                (2.0, 3.0),
+                (2.0, 2.0),
+                (1.0, 2.0),
+            ],
+        ],
+        'crs': {
+            'type': 'name',
+            'properties': {
+                'name': 'EPSG:4326'
+            }
+        }
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gmlce:SimplePolygon gml:id="ID"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                xmlns:gmlce="http://www.opengis.net/gml/3.3/ce"
+                srsName="EPSG:4326">
+            <gml:posList>
+                2.0 1.0 3.0 1.0 3.5 1.5 3.0 2.0 2.0 2.0
+            </gml:posList>
+        </gmlce:SimplePolygon>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
+
+    # encode Polygon (fallback to gml 3.2 Polygon when interiors)
+    result = encode_v33_ce({
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (1.0, 2.0),
+                (1.0, 3.0),
+                (2.0, 3.0),
+                (2.0, 2.0),
+                (1.0, 2.0),
+            ], [
+                (1.4, 2.4),
+                (1.4, 2.6),
+                (1.6, 2.6),
+                (1.6, 2.4),
+                (1.4, 2.4),
+            ],
+        ],
+    }, 'ID')
+    expected = etree.fromstring("""
+        <gml:Polygon gml:id="ID" xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:posList>
+                        1.0 2.0 1.0 3.0 2.0 3.0 2.0 2.0 1.0 2.0
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:exterior>
+            <gml:interior>
+                <gml:LinearRing>
+                    <gml:posList>
+                        1.4 2.4 1.4 2.6 1.6 2.6 1.6 2.4 1.4 2.4
+                    </gml:posList>
+                </gml:LinearRing>
+            </gml:interior>
+        </gml:Polygon>
+    """)
+    assert compare_trees(
+        expected, result
+    ), f'{etree.tostring(expected)} != {etree.tostring(result)}'

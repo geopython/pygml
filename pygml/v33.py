@@ -26,16 +26,17 @@
 # ------------------------------------------------------------------------------
 
 from lxml import etree
+from lxml.builder import ElementMaker
 
-from .types import GeomDict
+from .types import Coordinates, GeomDict
 from .v3_common import (
-    GML3Parser, determine_srs,
+    GML3Encoder, GML3Parser, determine_srs,
     parse_envelope, parse_point, parse_multi_point,
     parse_linestring_or_linear_ring, parse_multi_curve, parse_polygon,
     parse_multi_surface, parse_multi_geometry,
     NameSpaceMap, Element, ParseResult
 )
-from .v32 import NAMESPACE as NAMESPACE_32
+from .v32 import NAMESPACE as NAMESPACE_32, GML32_ENCODER
 
 
 NAMESPACE = 'http://www.opengis.net/gml/3.3/ce'
@@ -145,3 +146,61 @@ def parse_v33_ce(element: Element) -> GeomDict:
             `draft for GeoJSON <https://gist.github.com/sgillies/1233327>`_.
     """
     return GML33_CE_PARSER.parse(element)
+
+
+class GML33CEEncoder(GML3Encoder):
+    def __init__(self):
+        super().__init__(NAMESPACE_32, NSMAP, True)
+        self.gmlce = ElementMaker(namespace=NAMESPACE, nsmap=NSMAP)
+
+    def encode_polygon(self, coordinates: Coordinates, attrs: dict) -> Element:
+        if len(coordinates) == 1:
+            exterior = coordinates[0]
+            tag_name = None
+            if len(exterior) == 4:
+                tag_name = 'SimpleTriangle'
+            elif len(exterior) == 5:
+                tag_name = 'SimpleRectangle'
+            else:
+                tag_name = 'SimplePolygon'
+
+            return self.gmlce(
+                tag_name,
+                GML32_ENCODER._encode_pos_list(exterior[:-1]),
+                **attrs
+            )
+
+        return super().encode_polygon(coordinates, attrs)
+
+
+GML33CE_ENCODER = GML33CEEncoder()
+
+
+def encode_v33_ce(geometry: GeomDict, identifier: str) -> Element:
+    """ Encodes the given GeoJSON dict to its most simple GML 3.2
+        representation. As in GML 3.2 the gml:id attribute is mandatory,
+        the identifier must be passed as well.
+
+        In preparation of the encoding, the coordinates may have to be
+        swapped from XY order to YX order, depending on the used CRS.
+        This includes the case when no CRS is specified, as this means
+        the default WGS84 in GeoJSON, which in turn uses
+        latitude/longitude ordering GML.
+
+        This function returns an ``lxml.etree._Element`` which can be
+        altered or serialized.
+
+        >>> from pygml.v32 import encode_v32
+        >>> from lxml import etree
+        >>> tree = encode_v32({
+        ...     'type': 'Point',
+        ...     'coordinates': (1.0, 1.0)
+        ... }, 'ID')
+        >>> print(etree.tostring(tree, pretty_print=True).decode())
+        <gml:Point xmlns:gml="http://www.opengis.net/gml/3.2"
+            srsName="urn:ogc:def:crs:OGC::CRS84" gml:id="ID">
+          <gml:pos>1.0 1.0</gml:pos>
+        </gml:Point>
+    """
+
+    return GML33CE_ENCODER.encode(geometry, identifier)

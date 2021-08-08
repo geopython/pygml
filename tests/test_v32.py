@@ -1240,7 +1240,7 @@ def test_encode_v32_linestring():
 
 
 def test_encode_v32_polygon():
-    # encode LineString
+    # encode Polygon
     result = encode_v32({
         'type': 'Polygon',
         'coordinates': [
@@ -1282,7 +1282,7 @@ def test_encode_v32_polygon():
         expected, result
     ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
 
-    # encode LineString with EPSG:4326
+    # encode Polygon with EPSG:4326
     result = encode_v32({
         'type': 'Polygon',
         'coordinates': [
@@ -1332,7 +1332,7 @@ def test_encode_v32_polygon():
 
 
 def test_encode_v32_multi_polygon():
-    # encode LineString
+    # encode MultiPolygon
     result = encode_v32({
         'type': 'MultiPolygon',
         'coordinates': [
@@ -1411,7 +1411,7 @@ def test_encode_v32_multi_polygon():
         expected, result
     ), f'{etree.tostring(expected)} != {etree.tostring(result)}'
 
-    # encode LineString with EPSG:4326
+    # encode MultiPolygon with EPSG:4326
     result = encode_v32({
         'type': 'MultiPolygon',
         'coordinates': [

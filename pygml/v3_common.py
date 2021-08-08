@@ -505,101 +505,24 @@ class GML3Encoder:
         # GeometryCollections have no coordinates
         coordinates = geometry.get('coordinates')
         if type_ == 'Point':
-            return gml(
-                'Point',
-                gml('pos', ' '.join(str(c) for c in coordinates)),
-                **attrs
-            )
+            return self.encode_point(coordinates, attrs)
 
         elif type_ == 'MultiPoint':
-            return gml(
-                'MultiPoint',
-                gml('geometryMembers', *[
-                    gml(
-                        'Point',
-                        gml('pos', ' '.join(str(c) for c in coordinate)),
-                        **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
-                    )
-                    for i, coordinate in enumerate(coordinates)
-                ]),
-                **attrs
-            )
+            return self.encode_multi_point(coordinates, identifier, attrs)
 
         elif type_ == 'LineString':
-            return gml(
-                'LineString',
-                self._encode_pos_list(coordinates),
-                **attrs
-            )
+            return self.encode_line_string(coordinates, attrs)
 
         elif type_ == 'MultiLineString':
-            return gml(
-                'MultiCurve',
-                gml(
-                    'curveMembers', *[
-                        gml(
-                            'LineString',
-                            self._encode_pos_list(linestring),
-                            **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
-                        )
-                        for i, linestring in enumerate(coordinates)
-                    ]
-                ),
-                **attrs
+            return self.encode_multi_line_string(
+                coordinates, identifier, attrs
             )
 
         elif type_ == 'Polygon':
-            return gml(
-                'Polygon',
-                gml(
-                    'exterior',
-                    gml(
-                        'LinearRing',
-                        self._encode_pos_list(coordinates[0]),
-                    )
-                ), *[
-                    gml(
-                        'interior',
-                        gml(
-                            'LinearRing',
-                            self._encode_pos_list(linear_ring),
-                        )
-                    )
-                    for linear_ring in coordinates[1:]
-                ],
-                **attrs
-            )
+            return self.encode_polygon(coordinates, attrs)
 
         elif type_ == 'MultiPolygon':
-            return gml(
-                'MultiSurface',
-                gml(
-                    'surfaceMembers', *[
-                        gml(
-                            'Polygon',
-                            gml(
-                                'exterior',
-                                gml(
-                                    'LinearRing',
-                                    self._encode_pos_list(polygon[0]),
-                                )
-                            ), *[
-                                gml(
-                                    'interior',
-                                    gml(
-                                        'LinearRing',
-                                        self._encode_pos_list(linear_ring),
-                                    )
-                                )
-                                for linear_ring in polygon[1:]
-                            ],
-                            **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
-                        )
-                        for i, polygon in enumerate(coordinates)
-                    ]
-                ),
-                **attrs
-            )
+            return self.encode_multi_polygon(coordinates, identifier, attrs)
 
         elif type_ == 'GeometryCollection':
             geometries = geometry['geometries']
@@ -615,6 +538,108 @@ class GML3Encoder:
             )
 
         raise ValueError(f'Unable to encode geometry of type {type_}')
+
+    def encode_point(self, coordinates: Coordinates, attrs: dict) -> Element:
+        return self.gml(
+            'Point',
+            self.gml('pos', ' '.join(str(c) for c in coordinates)),
+            **attrs
+        )
+
+    def encode_multi_point(self, coordinates: Coordinates, identifier: str,
+                           attrs: dict) -> Element:
+        return self.gml(
+            'MultiPoint',
+            self.gml('geometryMembers', *[
+                self.gml(
+                    'Point',
+                    self.gml('pos', ' '.join(str(c) for c in coordinate)),
+                    **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
+                )
+                for i, coordinate in enumerate(coordinates)
+            ]),
+            **attrs
+        )
+
+    def encode_line_string(self, coordinates: Coordinates,
+                           attrs: dict) -> Element:
+        return self.gml(
+            'LineString',
+            self._encode_pos_list(coordinates),
+            **attrs
+        )
+
+    def encode_multi_line_string(self, coordinates: Coordinates,
+                                 identifier: str, attrs: dict) -> Element:
+        return self.gml(
+            'MultiCurve',
+            self.gml(
+                'curveMembers', *[
+                    self.gml(
+                        'LineString',
+                        self._encode_pos_list(linestring),
+                        **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
+                    )
+                    for i, linestring in enumerate(coordinates)
+                ]
+            ),
+            **attrs
+        )
+
+    def encode_polygon(self, coordinates: Coordinates,
+                       attrs: dict) -> Element:
+        return self.gml(
+            'Polygon',
+            self.gml(
+                'exterior',
+                self.gml(
+                    'LinearRing',
+                    self._encode_pos_list(coordinates[0]),
+                )
+            ), *[
+                self.gml(
+                    'interior',
+                    self.gml(
+                        'LinearRing',
+                        self._encode_pos_list(linear_ring),
+                    )
+                )
+                for linear_ring in coordinates[1:]
+            ],
+            **attrs
+        )
+
+    def encode_multi_polygon(self, coordinates: Coordinates,
+                             identifier: str, attrs: dict) -> Element:
+        return self.gml(
+            'MultiSurface',
+            self.gml(
+                'surfaceMembers', *[
+                    self.gml(
+                        'Polygon',
+                        self.gml(
+                            'exterior',
+                            self.gml(
+                                'LinearRing',
+                                self._encode_pos_list(polygon[0]),
+                            )
+                        ), *[
+                            self.gml(
+                                'interior',
+                                self.gml(
+                                    'LinearRing',
+                                    self._encode_pos_list(linear_ring),
+                                )
+                            )
+                            for linear_ring in polygon[1:]
+                        ],
+                        **{f'{{{self.namespace}}}id': f'{identifier}_{i}'}
+                    )
+                    for i, polygon in enumerate(coordinates)
+                ]
+            ),
+            **attrs
+        )
 
     def _encode_pos_list(self, coordinates: Coordinates) -> Element:
         return self.gml(
