@@ -177,9 +177,10 @@ GML33CE_ENCODER = GML33CEEncoder()
 
 
 def encode_v33_ce(geometry: GeomDict, identifier: str) -> Element:
-    """ Encodes the given GeoJSON dict to its most simple GML 3.2
-        representation. As in GML 3.2 the gml:id attribute is mandatory,
-        the identifier must be passed as well.
+    """ Encodes the given GeoJSON dict to its most simple GML 3.3 CE
+        representation, with a fallback to encoding it GML 3.2 when the
+        compact encoding is not possible. As in GML 3.2 the gml:id attribute
+        is mandatory, the identifier must be passed as well.
 
         In preparation of the encoding, the coordinates may have to be
         swapped from XY order to YX order, depending on the used CRS.
@@ -190,17 +191,25 @@ def encode_v33_ce(geometry: GeomDict, identifier: str) -> Element:
         This function returns an ``lxml.etree._Element`` which can be
         altered or serialized.
 
-        >>> from pygml.v32 import encode_v32
+        >>> from pygml.v33 import encode_v33_ce
         >>> from lxml import etree
-        >>> tree = encode_v32({
-        ...     'type': 'Point',
-        ...     'coordinates': (1.0, 1.0)
+        >>> tree = encode_v33_ce({
+        ...     'type': 'Polygon',
+        ...     'coordinates': [
+        ...         [
+        ...             (1.0, 2.0),
+        ...             (1.0, 3.0),
+        ...             (2.0, 2.0),
+        ...             (1.0, 2.0),
+        ...         ],
+        ...     ],
         ... }, 'ID')
         >>> print(etree.tostring(tree, pretty_print=True).decode())
-        <gml:Point xmlns:gml="http://www.opengis.net/gml/3.2"
-            srsName="urn:ogc:def:crs:OGC::CRS84" gml:id="ID">
-          <gml:pos>1.0 1.0</gml:pos>
-        </gml:Point>
+        <gmlce:SimpleTriangle xmlns:gmlce="http://www.opengis.net/gml/3.3/ce"
+                xmlns:gml="http://www.opengis.net/gml/3.2"
+                srsName="urn:ogc:def:crs:OGC::CRS84" gml:id="ID">
+          <gml:posList>1.0 2.0 1.0 3.0 2.0 2.0</gml:posList>
+        </gmlce:SimpleTriangle>
     """
 
     return GML33CE_ENCODER.encode(geometry, identifier)
