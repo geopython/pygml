@@ -36,8 +36,10 @@ from .basics import (
 )
 from .dimensionality import get_dimensionality
 from .types import GeomDict
-from .pre_v32 import NAMESPACE as NAMESPACE_PRE32, parse_pre_v32
-from .v32 import NAMESPACE as NAMESPACE_32, encode_v32, parse_v32
+from .pre_v32 import (
+    NAMESPACE as NAMESPACE_PRE32, parse_pre_v32, encode_pre_v32
+)
+from .v32 import NAMESPACE as NAMESPACE_32, parse_v32
 from .v33 import NAMESPACE as NAMESPACE_33_CE, parse_v33_ce
 
 
@@ -131,7 +133,7 @@ GmlEncoder = Callable[[GeomDict, str], Element]
 
 
 def encode_georss(geometry: GeomDict,
-                  gml_encoder: GmlEncoder = encode_v32) -> Element:
+                  gml_encoder: GmlEncoder = encode_pre_v32) -> Element:
     """ Encodes a GeoJSON geometry as a GeoRSS ``lxml.etree.Element``.
         Tries to use the native GeoRSS elements ``point``, ``line``,
         or ``polygon`` when possible. Falls back to ``georss:where``
