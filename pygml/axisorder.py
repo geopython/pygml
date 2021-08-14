@@ -184,12 +184,13 @@ AXISORDER_YX = {
 
 RE_CRS_CODE = re.compile(
     r'(EPSG:|'
-    r'http://www\.opengis\.net/def/crs/EPSG/0/|'
+    r'http://www\.opengis\.net/def/crs/epsg/0/|'
     r'http://www\.opengis\.net/gml/srs/epsg\.xml\#|'
     r'urn:EPSG:geographicCRS:|'
     r'urn:ogc:def:crs:EPSG::|'
     r'urn:ogc:def:crs:OGC::|'
-    r'urn:ogc:def:crs:EPSG:)([0-9]+|CRS84)'
+    r'urn:ogc:def:crs:EPSG:)([0-9]+|CRS84)',
+    re.IGNORECASE,
 )
 
 
