@@ -522,6 +522,27 @@ def test_parse_polygon():
         ]
     }
 
+    # using gml:posList with no interiors
+    result = parse_pre_v32(
+        etree.fromstring("""
+        <gml:Polygon xmlns:gml="http://www.opengis.net/gml">
+            <gml:exterior>
+                <gml:LinearRing>
+                    <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0</gml:posList>
+                </gml:LinearRing>
+            </gml:exterior>
+        </gml:Polygon>
+        """)
+    )
+    assert result == {
+        'type': 'Polygon',
+        'coordinates': [
+            [
+                (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+            ],
+        ]
+    }
+
     # using gml:pos elements
     result = parse_pre_v32(
         etree.fromstring("""
@@ -782,6 +803,50 @@ def test_parse_multi_polygon():
                 ],
                 [
                     (10.2, 10.2), (10.5, 10.2), (10.2, 10.5), (10.2, 10.2)
+                ],
+            ]
+        ]
+    }
+
+    # using gml:surfaceMember elements with no interiors
+    result = parse_pre_v32(
+        etree.fromstring("""
+        <gml:MultiSurface xmlns:gml="http://www.opengis.net/gml">
+            <gml:surfaceMember>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>0.0 0.0 1.0 0.0 0.0 1.0 0.0 0.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                </gml:Polygon>
+            </gml:surfaceMember>
+            <gml:surfaceMember>
+                <gml:Polygon>
+                    <gml:exterior>
+                        <gml:LinearRing>
+                            <gml:posList>
+                                10.0 10.0 11.0 10.0 10.0 11.0 10.0 10.0
+                            </gml:posList>
+                        </gml:LinearRing>
+                    </gml:exterior>
+                </gml:Polygon>
+            </gml:surfaceMember>
+        </gml:MultiSurface>
+        """)
+    )
+    assert result == {
+        'type': 'MultiPolygon',
+        'coordinates': [
+            [
+                [
+                    (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (0.0, 0.0)
+                ],
+            ],
+            [
+                [
+                    (10.0, 10.0), (11.0, 10.0), (10.0, 11.0), (10.0, 10.0)
                 ],
             ]
         ]

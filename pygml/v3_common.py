@@ -315,16 +315,22 @@ def parse_polygon(element: Element, nsmap: NameSpaceMap) -> ParseResult:
     )
     exterior = exterior['coordinates']
 
-    interior_rings, int_srss = zip(*(
-        parse_linestring_or_linear_ring(linear_ring, nsmap)
-        for linear_ring in element.xpath(
-            'gml:interior/gml:LinearRing', namespaces=nsmap
-        )
-    ))
-    interiors = [
-        ring['coordinates']
-        for ring in interior_rings
-    ]
+    interior_elems = element.xpath(
+        'gml:interior/gml:LinearRing', namespaces=nsmap
+    )
+
+    if len(interior_elems) > 0:
+        interior_rings, int_srss = zip(*(
+            parse_linestring_or_linear_ring(linear_ring, nsmap)
+            for linear_ring in interior_elems
+        ))
+        interiors = [
+            ring['coordinates']
+            for ring in interior_rings
+        ]
+    else:
+        interiors = []
+        int_srss = []
 
     srs = determine_srs(element.attrib.get('srsName'), ext_srs, *int_srss)
 
