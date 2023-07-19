@@ -54,5 +54,7 @@ def parse(source: Union[etree._Element, str]) -> Geometry:
         result = parse_v33_ce(element)
     elif namespace == NAMESPACE_GEORSS:
         result = parse_georss(element)
+    else:
+        raise RuntimeError(f"Could not parse element {element}, unrecognized namespace. Did you select the correct node?")
 
     return Geometry(result)
