@@ -8,6 +8,8 @@ def test_get_crs_code():
     assert get_crs_code('EPSG:4326') == 4326
     assert get_crs_code('http://www.opengis.net/def/crs/EPSG/0/4326') == 4326
     assert get_crs_code('http://www.opengis.net/gml/srs/epsg.xml#4326') == 4326
+    assert get_crs_code('https://www.opengis.net/def/crs/EPSG/0/4326') == 4326
+    assert get_crs_code('https://www.opengis.net/gml/srs/epsg.xml#4326') == 4326
     assert get_crs_code('urn:EPSG:geographicCRS:4326') == 4326
     assert get_crs_code('urn:ogc:def:crs:EPSG::4326') == 4326
     assert get_crs_code('urn:ogc:def:crs:EPSG:4326') == 4326
