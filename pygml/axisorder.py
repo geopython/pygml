@@ -184,8 +184,8 @@ AXISORDER_YX = {
 
 RE_CRS_CODE = re.compile(
     r'(EPSG:|'
-    r'http://www\.opengis\.net/def/crs/epsg/0/|'
-    r'http://www\.opengis\.net/gml/srs/epsg\.xml\#|'
+    r'http[s]?://www\.opengis\.net/def/crs/epsg/0/|'
+    r'http[s]?://www\.opengis\.net/gml/srs/epsg\.xml\#|'
     r'urn:EPSG:geographicCRS:|'
     r'urn:ogc:def:crs:EPSG::|'
     r'urn:ogc:def:crs:OGC::|'
@@ -201,6 +201,8 @@ def get_crs_code(crs: str) -> Union[int, str]:
             * ``EPSG:<EPSG code>``
             * ``http://www.opengis.net/def/crs/EPSG/0/<EPSG code>``
             * ``http://www.opengis.net/gml/srs/epsg.xml#<EPSG code>``
+            * ``https://www.opengis.net/def/crs/EPSG/0/<EPSG code>``
+            * ``https://www.opengis.net/gml/srs/epsg.xml#<EPSG code>``
             * ``urn:EPSG:geographicCRS:<epsg code>``
             * ``urn:ogc:def:crs:EPSG::<EPSG code>``
             * ``urn:ogc:def:crs:OGC::<EPSG code>``
