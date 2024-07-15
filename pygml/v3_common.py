@@ -209,7 +209,7 @@ def parse_linestring_or_linear_ring(element: Element,
         pos_list0 = pos_lists[0]
         coordinates = parse_poslist(
             pos_list0.text,
-            int(pos_list0.attrib.get('srsDimension', 2))
+            int(pos_list0.attrib.get('srsDimension', element.attrib.get('srsDimension', 2)))
         )
         srs = pos_list0.attrib.get('srsName')
     elif poss:
