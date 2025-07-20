@@ -196,11 +196,15 @@ def parse_multi_point(element: Element, nsmap: NameSpaceMap) -> ParseResult:
 
 
 def parse_linestring_or_linear_ring(element: Element,
-                                    nsmap: NameSpaceMap) -> ParseResult:
+                                    nsmap: NameSpaceMap,
+                                    dimension: int=None) -> ParseResult:
     pos_lists = element.xpath('gml:posList', namespaces=nsmap)
     poss = element.xpath('gml:pos', namespaces=nsmap)
     coordinates_elems = element.xpath('gml:coordinates', namespaces=nsmap)
     coords = element.xpath('gml:coord', namespaces=nsmap)
+
+    if dimension is None:
+        dimension = 2
 
     if pos_lists:
         if len(pos_lists) > 1:
@@ -209,7 +213,7 @@ def parse_linestring_or_linear_ring(element: Element,
         pos_list0 = pos_lists[0]
         coordinates = parse_poslist(
             pos_list0.text,
-            int(pos_list0.attrib.get('srsDimension', 2))
+            int(pos_list0.attrib.get('srsDimension', element.attrib.get('srsDimension', dimension)))
         )
         srs = pos_list0.attrib.get('srsName')
     elif poss:
@@ -263,8 +267,9 @@ def parse_multi_curve(element: Element, nsmap: NameSpaceMap) -> ParseResult:
             'Only gml:LineString elements are supported for gml:MultiCurves'
         )
 
+    dimension = element.attrib.get('srsDimension')
     linestrings, srss = zip(*(
-        parse_linestring_or_linear_ring(linestring_element, nsmap)
+        parse_linestring_or_linear_ring(linestring_element, nsmap, dimension)
         for linestring_element in linestring_elements
     ))
 
@@ -285,8 +290,9 @@ def parse_multi_linestring(element: Element,
         'gml:lineStringMember/gml:LineString',
         namespaces=nsmap
     )
+    dimension = element.attrib.get('srsDimension')
     linestrings, srss = zip(*(
-        parse_linestring_or_linear_ring(linestring_element, nsmap)
+        parse_linestring_or_linear_ring(linestring_element, nsmap, dimension)
         for linestring_element in linestring_elements
     ))
 
@@ -310,8 +316,9 @@ def parse_polygon(element: Element, nsmap: NameSpaceMap) -> ParseResult:
     elif len(exterior_rings) > 1:
         raise ValueError('Too many gml:exterior/gml:LinearRing elements')
 
+    dimension = element.attrib.get('srsDimension')
     exterior, ext_srs = parse_linestring_or_linear_ring(
-        exterior_rings[0], nsmap
+        exterior_rings[0], nsmap, dimension
     )
     exterior = exterior['coordinates']
 
@@ -321,7 +328,7 @@ def parse_polygon(element: Element, nsmap: NameSpaceMap) -> ParseResult:
 
     if len(interior_elems) > 0:
         interior_rings, int_srss = zip(*(
-            parse_linestring_or_linear_ring(linear_ring, nsmap)
+            parse_linestring_or_linear_ring(linear_ring, nsmap, dimension)
             for linear_ring in interior_elems
         ))
         interiors = [
