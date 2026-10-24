@@ -58,7 +58,7 @@ setup(
     author_email='fabian.schindler@eox.at',
     url='https://github.com/geopython/pygml',
     license='MIT',
-    packages=find_packages(),
+    packages=find_packages(include=["pygml*"]),
     include_package_data=True,
     install_requires=[
         "dataclasses;python_version<'3.7'",
